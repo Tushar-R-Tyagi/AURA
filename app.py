@@ -45,9 +45,85 @@ def load_theme():
 
 load_theme()
 
+
 # Shared defaults now live in `database.session_store`.
 
+def parse_component_names(value):
+    """Normalize component values into a clean string list."""
+    if isinstance(value, (list, tuple, set)):
+        raw_items = value
+    else:
+        raw_items = str(value or "").split(",")
+    return [str(item).strip() for item in raw_items if str(item).strip()]
+
+
+def sync_master_data_to_legacy_state():
+    """Keep experimental master-data records in sync with legacy dashboard state."""
+    st.session_state.setdefault("products_data", [])
+    st.session_state.setdefault("components_data", [])
+
+    if not st.session_state.components_data:
+        return
+
+    component_map = {}
+    component_products = {}
+    component_requirements = {}
+    component_transfer_times = {}
+
+    for component in st.session_state.components_data:
+        component_name = str(component.get("component_name", "")).strip()
+        if not component_name:
+            continue
+
+        responsible_people = parse_component_names(component.get("responsible_persons", []))
+        component_map[component_name] = responsible_people
+        component_products[component_name] = component.get("product_name", "Unknown")
+        component_requirements[component_name] = int(component.get("required_resources", 1))
+        component_transfer_times[component_name] = int(component.get("knowledge_transfer_time_needed", 6))
+
+    st.session_state.component_map = component_map
+    st.session_state.component_products = component_products
+    st.session_state.component_requirements = component_requirements
+    st.session_state.component_transfer_times = component_transfer_times
+
+    for product in st.session_state.products_data:
+        product_name = str(product.get("product_name", "")).strip()
+        if not product_name:
+            continue
+        product["components"] = sorted(
+            component_name
+            for component_name, mapped_product in component_products.items()
+            if mapped_product == product_name
+        )
+
+
+def get_active_component_assignments(frame: pd.DataFrame, component_name: str, responsible_list: list[str]) -> list[dict]:
+    """Return active employees mapped to a component and the matching assignment."""
+    if frame.empty:
+        return []
+
+    matches = []
+    component_key = component_name.strip().lower()
+
+    for _, row in frame.iterrows():
+        person_name = str(row.get("name", "")).strip()
+        person_components = parse_component_names(row.get("components", ""))
+        matched_components = [item for item in person_components if item.strip().lower() == component_key]
+
+        if matched_components or person_name in responsible_list:
+            matches.append(
+                {
+                    "name": person_name,
+                    "matched_components": matched_components or [component_name],
+                }
+            )
+
+    return matches
+
+
 def main():
+    sync_master_data_to_legacy_state()
+
     # Update priorities based on tenure at the start of each run
     update_priorities_from_tenure(st.session_state.team_data)
     
@@ -297,6 +373,10 @@ def main():
         edit_index = st.session_state.editing_index
         member = st.session_state.team_data[edit_index]
         
+        existing_settings = st.session_state.employee_settings.get(member['name'], {})
+        default_weekly_hours = int(existing_settings.get('weekly_hours', st.session_state.budget_data.get(member.get('employee_type', 'Intern'), {}).get('weekly_hours', 35) or 35))
+        default_hourly_rate = float(existing_settings.get('hourly_rate', st.session_state.budget_data.get(member.get('employee_type', 'Intern'), {}).get('hourly_rate', 0) or 0))
+
         with st.form(f"edit_form_{edit_index}"):
             col1, col2 = st.columns(2)
             
@@ -305,6 +385,8 @@ def main():
                 edit_role = st.text_input("Rolle/Position", value=member['role'])
                 edit_employee_type = st.selectbox("Mitarbeitertyp", ["Intern", "Lead Cost Employee (LCE)", "Extern"], index=["Intern", "Lead Cost Employee (LCE)", "Extern"].index(member.get('employee_type', 'Intern')))
                 edit_components = st.text_area("Wichtige Komponenten/Verantwortlichkeiten", value=member['components'])
+                edit_weekly_hours = st.number_input("Kontakt-/Wochenstunden", min_value=0, max_value=80, value=default_weekly_hours, step=1)
+                edit_hourly_rate = st.number_input("Stundensatz (€/h)", min_value=0.0, value=default_hourly_rate, step=0.5)
             
             with col2:
                 edit_start_date = st.date_input("Startdatum", value=datetime.strptime(member['start_date'], "%Y-%m-%d"))
@@ -334,6 +416,8 @@ def main():
                 cancel_clicked = st.form_submit_button("❌ Abbrechen", use_container_width=True)
             
             if save_clicked:
+                previous_name = member['name']
+
                 # Use manually entered values for priority and knowledge transfer status
                 st.session_state.team_data[edit_index] = {
                     "name": edit_name,
@@ -348,7 +432,14 @@ def main():
                     "team": edit_team,
                     "manual_override": True
                 }
+                if previous_name != edit_name and previous_name in st.session_state.employee_settings:
+                    del st.session_state.employee_settings[previous_name]
+                st.session_state.employee_settings[edit_name] = {
+                    "hourly_rate": float(edit_hourly_rate),
+                    "weekly_hours": int(edit_weekly_hours),
+                }
                 save_team_data(st.session_state.team_data)
+                save_employee_settings(st.session_state.employee_settings)
                 st.session_state.editing_index = None
                 st.rerun()
             
@@ -673,13 +764,33 @@ def main():
         st.markdown('<div class="product-section">', unsafe_allow_html=True)
         st.markdown('<div class="product-title">🎯 Produkten Übersicht 🚀</div>', unsafe_allow_html=True)
         
+        product_phase_lookup = {
+            item.get("product_name", ""): item.get("current_phase", "Unbekannt")
+            for item in st.session_state.get("products_data", [])
+            if item.get("product_name")
+        }
+        component_details_lookup = {
+            item.get("component_name", ""): item
+            for item in st.session_state.get("components_data", [])
+            if item.get("component_name")
+        }
+
         # Group components by product
         products = {}
         for component, responsible in st.session_state.component_map.items():
             product = st.session_state.component_products.get(component, "Unknown")
             if product not in products:
-                products[product] = []
-            products[product].append((component, responsible))
+                products[product] = {
+                    "phase": product_phase_lookup.get(product, "Unbekannt"),
+                    "components": [],
+                }
+            products[product]["components"].append(
+                {
+                    "name": component,
+                    "responsible": responsible,
+                    "details": component_details_lookup.get(component, {}),
+                }
+            )
         
         # Display each product
         for product in sorted(products.keys()):
@@ -688,18 +799,38 @@ def main():
             # Product header with emoji
             product_emojis = {"CG": "🔧", "iUZ": "⚙️", "iBS": "💼"}
             emoji = product_emojis.get(product, "📦")
-            st.markdown(f'<div class="product-card-header">{emoji} Produkt: {product}</div>', unsafe_allow_html=True)
+            phase = products[product]["phase"]
+            st.markdown(f'<div class="product-card-header">{emoji} Produkt: {product} • Phase: {phase}</div>', unsafe_allow_html=True)
             
             # Components under this product
-            st.markdown(f"**Komponenten ({len(products[product])}):**")
-            for component, responsible in products[product]:
+            st.markdown(f"**Komponenten ({len(products[product]['components'])}):**")
+            for component_entry in products[product]["components"]:
+                component = component_entry["name"]
+                responsible = component_entry["responsible"]
+                details = component_entry["details"]
                 responsible_list = responsible if isinstance(responsible, (list, tuple)) else [responsible]
+                complexity_score = int(details.get("complexity_score", 5))
+                required_people = int(details.get("required_resources", st.session_state.component_requirements.get(component, 1)))
+                transfer_time_months = int(details.get("knowledge_transfer_time_needed", st.session_state.component_transfer_times.get(component, 6)))
+                documentation_status = details.get("documentation_status", "Nicht bewertet")
+                backup_available = "Ja" if details.get("backup_available", False) else "Nein"
+                active_assignments = get_active_component_assignments(df, component, responsible_list)
+
                 st.markdown(f'<div class="component-item"><strong>📦 {component}</strong>', unsafe_allow_html=True)
+                st.markdown(
+                    f"Komplexität: **{complexity_score}/10** • Bedarf: **{required_people}** • KT-Zeit: **{transfer_time_months} Monate** • Doku: **{documentation_status}** • Backup: **{backup_available}**"
+                )
+                if active_assignments:
+                    active_summary = ", ".join(
+                        f"{item['name']} ({', '.join(item['matched_components'])})"
+                        for item in active_assignments
+                    )
+                    st.markdown(f"**Aktive Mitarbeitende:** {active_summary}")
+                else:
+                    st.markdown("**Aktive Mitarbeitende:** Keine Zuordnung gefunden")
                 
                 # Get responsible persons data
-                transfer_time_months = int(st.session_state.component_transfer_times.get(component, 6))
                 transfer_time_days = transfer_time_months * 30
-                today = pd.Timestamp.today().normalize()
                 
                 # Check each responsible person
                 critical_people = []
@@ -825,14 +956,34 @@ def main():
     
     # ADD NEW MEMBER FORM IN SIDEBAR
     colors = get_colors()
-    st.sidebar.markdown(f'<h3 style="color: {colors["primary"]};">➕ Teammitglied hinzufügen</h3>', unsafe_allow_html=True)
+    st.sidebar.markdown(f'<h3 style="color: {colors["primary"]};">➕ Teammitglied von Grund auf hinzufügen</h3>', unsafe_allow_html=True)
+
+    known_component_options = sorted(
+        set(st.session_state.get("component_map", {}).keys()).union(
+            {
+                component.get("component_name", "")
+                for component in st.session_state.get("components_data", [])
+                if component.get("component_name")
+            }
+        )
+    )
     
     with st.sidebar.form("add_member", clear_on_submit=True):
         name = st.text_input("Vollständiger Name")
         role = st.text_input("Rolle/Position")
         employee_type = st.selectbox("Mitarbeitertyp", ["Intern", "Lead Cost Employee (LCE)", "Extern"])
-        components = st.text_area("Wichtige Komponenten/Verantwortlichkeiten")
+        team = st.selectbox("Team", ["CS1", "CS2", "CS3", "CS4", "CS5", "Unassigned"], index=5)
+        selected_components = st.multiselect("Zugeordnete Komponenten", options=known_component_options)
+        extra_components = st.text_input("Weitere Komponenten (kommagetrennt)")
         dob = st.date_input("Geburtsdatum", value=datetime(1990, 1, 1))
+
+        col_fin1, col_fin2 = st.columns(2)
+        with col_fin1:
+            weekly_hours_default = int(st.session_state.budget_data.get(employee_type, {}).get("weekly_hours", 35) or 35)
+            weekly_hours = st.number_input("Kontakt-/Wochenstunden", min_value=0, max_value=80, value=weekly_hours_default, step=1)
+        with col_fin2:
+            hourly_rate_default = float(st.session_state.budget_data.get(employee_type, {}).get("hourly_rate", 0) or 0)
+            hourly_rate = st.number_input("Stundensatz (€/h)", min_value=0.0, value=hourly_rate_default, step=0.5)
         
         col1, col2 = st.columns(2)
         with col1:
@@ -852,18 +1003,16 @@ def main():
             calculated_priority = calculate_priority_from_tenure(start_date.strftime("%Y-%m-%d"))
             priority_options = ["Low", "Medium", "High", "Critical"]
             priority = st.selectbox("Prioritätsstufe", priority_options, index=priority_options.index(calculated_priority) if calculated_priority in priority_options else 0, key="add_priority")
-        # Team Auswahl
-        team = st.selectbox("Team", ["CS1", "CS2", "CS3", "CS4", "CS5", "Unassigned"], index=5)
         
-        submitted = st.form_submit_button("💾 Teammitglied hinzufügen", use_container_width=True)
+        submitted = st.form_submit_button("💾 Teammitglied speichern", use_container_width=True)
         if submitted:
             if name and role:
-                # Use manually entered values for priority and knowledge transfer status
+                all_components = sorted(dict.fromkeys(selected_components + parse_component_names(extra_components)))
                 new_member = {
                     "name": name,
                     "role": role,
                     "employee_type": employee_type,
-                    "components": components,
+                    "components": ", ".join(all_components),
                     "start_date": start_date.strftime("%Y-%m-%d"),
                     "planned_exit": planned_exit.strftime("%Y-%m-%d"),
                     "knowledge_transfer_status": kt_status,
@@ -873,36 +1022,125 @@ def main():
                     "manual_override": True
                 }
                 st.session_state.team_data.append(new_member)
+                st.session_state.employee_settings[name] = {
+                    "hourly_rate": float(hourly_rate),
+                    "weekly_hours": int(weekly_hours),
+                }
                 save_team_data(st.session_state.team_data)
+                save_employee_settings(st.session_state.employee_settings)
                 st.rerun()
             else:
                 st.sidebar.error("Please fill at least Name and Rolle")
-    # COMPONENT ASSIGNMENT FORM IN SIDEBAR
+
+    # PRODUCT & COMPONENT MASTER DATA IN SIDEBAR
     if 'component_map' not in st.session_state:
         st.session_state.component_map = {}
-    
-    # Initialize product assignments for components
     if 'component_products' not in st.session_state:
         st.session_state.component_products = {}
+    if 'products_data' not in st.session_state:
+        st.session_state.products_data = []
+    if 'components_data' not in st.session_state:
+        st.session_state.components_data = []
 
     colors = get_colors()
-    st.sidebar.markdown(f'#### 🧪 Neue Komponente hinzufügen')
+    st.sidebar.markdown('#### 🧭 Neues Produkt hinzufügen')
+    with st.sidebar.form("add_product_form", clear_on_submit=True):
+        product_name_input = st.text_input("Produktname")
+        current_phase = st.selectbox("Aktuelle Phase", ["Idee", "Planung", "Design", "Umsetzung", "Test", "Rollout", "Betrieb"])
+        product_description = st.text_input("Kurzbeschreibung / Ziel")
+        product_submitted = st.form_submit_button("💾 Produkt speichern", use_container_width=True)
+
+        if product_submitted:
+            product_name_clean = product_name_input.strip()
+            if product_name_clean:
+                linked_components = sorted(
+                    component.get("component_name", "")
+                    for component in st.session_state.components_data
+                    if component.get("product_name") == product_name_clean and component.get("component_name")
+                )
+                product_record = {
+                    "product_name": product_name_clean,
+                    "current_phase": current_phase,
+                    "description": product_description.strip(),
+                    "components": linked_components,
+                }
+                existing_product_index = next(
+                    (
+                        index
+                        for index, existing in enumerate(st.session_state.products_data)
+                        if existing.get("product_name") == product_name_clean
+                    ),
+                    None,
+                )
+                if existing_product_index is not None:
+                    st.session_state.products_data[existing_product_index] = product_record
+                else:
+                    st.session_state.products_data.append(product_record)
+                save_component_state()
+                st.sidebar.success(f"✅ Produkt '{product_name_clean}' gespeichert.")
+            else:
+                st.sidebar.error("Bitte geben Sie einen Produktnamen ein.")
+
+    st.sidebar.markdown('#### 🧪 Neue Komponente hinzufügen')
+    product_options = [item.get("product_name") for item in st.session_state.products_data if item.get("product_name")] or ["CG", "iUZ", "iBS"]
     with st.sidebar.form("add_component_form", clear_on_submit=True):
         component_name = st.text_input("Komponentenname")
-        product_name = st.selectbox("Produkt", options=["CG", "iUZ", "iBS"])
+        product_name = st.selectbox("Produkt", options=product_options)
         responsible_persons = st.multiselect("Verantwortliche Person(en)", options=[member['name'] for member in st.session_state.team_data])
+        complexity_score = st.slider("Komplexität (1-10)", min_value=1, max_value=10, value=5)
         required_count = st.number_input("Benötigte Anzahl Personen (permanent)", min_value=1, max_value=10, value=1)
         transfer_time = st.number_input("Wissensübergabe Zeit (Monate)", min_value=1, max_value=24, value=6)
+        documentation_status = st.selectbox("Dokumentationsgrad", ["Nicht bewertet", "Niedrig", "Mittel", "Gut"])
+        backup_available = st.checkbox("Backup verfügbar")
         component_submitted = st.form_submit_button("💾 Komponente speichern", use_container_width=True)
 
         if component_submitted:
-            if component_name and responsible_persons:
-                st.session_state.component_map[component_name] = responsible_persons
-                st.session_state.component_products[component_name] = product_name
-                st.session_state.component_requirements[component_name] = int(required_count)
-                st.session_state.component_transfer_times[component_name] = int(transfer_time)
+            component_name_clean = component_name.strip()
+            if component_name_clean and responsible_persons:
+                component_record = {
+                    "component_name": component_name_clean,
+                    "product_name": product_name,
+                    "responsible_persons": responsible_persons,
+                    "complexity_score": int(complexity_score),
+                    "knowledge_transfer_time_needed": int(transfer_time),
+                    "required_resources": int(required_count),
+                    "documentation_status": documentation_status,
+                    "backup_available": bool(backup_available),
+                }
+                existing_component_index = next(
+                    (
+                        index
+                        for index, existing in enumerate(st.session_state.components_data)
+                        if existing.get("component_name") == component_name_clean
+                    ),
+                    None,
+                )
+                if existing_component_index is not None:
+                    st.session_state.components_data[existing_component_index] = component_record
+                else:
+                    st.session_state.components_data.append(component_record)
+
+                matching_product = next(
+                    (item for item in st.session_state.products_data if item.get("product_name") == product_name),
+                    None,
+                )
+                if matching_product is None:
+                    st.session_state.products_data.append(
+                        {
+                            "product_name": product_name,
+                            "current_phase": "Planung",
+                            "description": "",
+                            "components": [component_name_clean],
+                        }
+                    )
+                else:
+                    matching_product["components"] = sorted(
+                        set(parse_component_names(matching_product.get("components", [])) + [component_name_clean])
+                    )
+
+                sync_master_data_to_legacy_state()
                 save_component_state()
-                st.sidebar.success(f"✅ '{component_name}' ({product_name}) wurde {', '.join(responsible_persons)} zugewiesen.")
+                st.sidebar.success(f"✅ '{component_name_clean}' ({product_name}) wurde {', '.join(responsible_persons)} zugewiesen.")
             else:
                 st.sidebar.error("Bitte geben Sie einen Namen und wählen Sie eine verantwortliche Person aus.")
 
@@ -919,7 +1157,7 @@ def main():
         else:
             st.sidebar.error("Keine Daten zum Exportieren")
     
-    if st.sidebar.button("🗑️ Alle Daten löschen", use_container_width=True):
+    if st.sidebar.button("🧪 Neu von Grund auf starten", use_container_width=True):
         st.session_state.team_data = []
         st.session_state.project_allocations = []
         st.session_state.employee_settings = {}
@@ -927,6 +1165,8 @@ def main():
         st.session_state.component_requirements = {}
         st.session_state.component_transfer_times = {}
         st.session_state.component_products = {}
+        st.session_state.products_data = []
+        st.session_state.components_data = []
         st.session_state.editing_index = None
         save_team_data([])
         save_project_allocations([])

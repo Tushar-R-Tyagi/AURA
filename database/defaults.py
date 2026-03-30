@@ -142,6 +142,8 @@ PERSISTED_STATE_DEFAULTS = {
     "component_requirements": {},
     "component_transfer_times": {},
     "component_products": {},
+    "products_data": [],
+    "components_data": [],
 }
 
 TRANSIENT_STATE_DEFAULTS = {

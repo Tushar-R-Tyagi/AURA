@@ -102,6 +102,8 @@ def save_component_state() -> None:
         "component_requirements": st.session_state.get("component_requirements", {}),
         "component_transfer_times": st.session_state.get("component_transfer_times", {}),
         "component_products": st.session_state.get("component_products", {}),
+        "products_data": st.session_state.get("products_data", []),
+        "components_data": st.session_state.get("components_data", []),
     }
     save_app_settings(component_settings)
 
