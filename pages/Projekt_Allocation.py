@@ -5,6 +5,20 @@ import plotly.graph_objects as go
 from datetime import datetime, date, timedelta
 import numpy as np
 
+from database.session_store import (
+    DEFAULT_PROJECT_COLORS,
+    DEFAULT_PROJECTS,
+    ensure_session_state,
+    save_project_allocations,
+)
+from logic.allocation_service import (
+    check_overallocation,
+    get_next_allocation_id,
+    validate_allocation_dates,
+)
+from logic.team_service import build_team_dataframe
+from ui.theme import load_theme
+
 # Page config
 st.set_page_config(
     page_title="Projekt-Allocation",
@@ -12,28 +26,17 @@ st.set_page_config(
     layout="wide"
 )
 
-# Initialize project allocation data
-if 'project_allocations' not in st.session_state:
-    st.session_state.project_allocations = []
+ensure_session_state()
+load_theme(st.session_state.dark_mode)
 
-# Projects
-PROJECTS = ["CG", "iUZ", "iBS"]
-PROJECT_COLORS = {
-    "CG": "#FF6B6B",
-    "iUZ": "#4ECDC4",
-    "iBS": "#45B7D1"
-}
-
-# Check if team_data exists
-if 'team_data' not in st.session_state:
-    st.error("Teamdaten nicht gefunden. Bitte zuerst die Organisationsseite besuchen.")
-    st.stop()
+PROJECTS = DEFAULT_PROJECTS
+PROJECT_COLORS = DEFAULT_PROJECT_COLORS
 
 st.title("📅 Projekt-Allocation Management")
 st.markdown("Verfolgung der Mitarbeiter-Allokation auf Projekte über Zeit")
 
 # Get team data
-df_team = pd.DataFrame(st.session_state.team_data)
+df_team = build_team_dataframe(st.session_state.team_data)
 
 # Sidebar for allocation management
 st.sidebar.markdown("### ➕ Neue Allocation hinzufügen")
@@ -59,48 +62,32 @@ with st.sidebar.form("add_allocation"):
     submitted = st.form_submit_button("💾 Allocation speichern")
 
     if submitted:
-        # Validate that end date is after start date
-        if end_month < start_month:
+        if not validate_allocation_dates(start_month, end_month):
             st.error("Enddatum muss nach Startdatum liegen!")
         else:
-            # Check for overallocation (total allocation > 100% for any month)
-            overallocated = False
-            over_allocation_month = None
-
-            # Generate months for this allocation
-            check_date = start_month.replace(day=1)
-            while check_date <= end_month:
-                total_allocation = allocation_percentage
-                # Add existing allocations for this employee in this month
-                for alloc in st.session_state.project_allocations:
-                    if (alloc['employee'] == selected_employee and
-                        alloc['start_date'] <= check_date <= alloc['end_date']):
-                        total_allocation += alloc['percentage']
-
-                if total_allocation > 100:
-                    overallocated = True
-                    over_allocation_month = check_date.strftime('%Y-%m')
-                    break
-
-                # Move to next month
-                if check_date.month == 12:
-                    check_date = check_date.replace(year=check_date.year + 1, month=1)
-                else:
-                    check_date = check_date.replace(month=check_date.month + 1)
+            overallocated, over_allocation_month, total_allocation = check_overallocation(
+                st.session_state.project_allocations,
+                selected_employee,
+                start_month,
+                end_month,
+                allocation_percentage,
+            )
 
             if overallocated:
-                st.error(f"Overallokation in {over_allocation_month}! Gesamtallokation würde {total_allocation}% übersteigen (max. 100%).")
+                st.error(
+                    f"Overallokation in {over_allocation_month}! Gesamtallokation würde {total_allocation}% übersteigen (max. 100%)."
+                )
             else:
-                # Add allocation
                 allocation = {
                     'employee': selected_employee,
                     'project': selected_project,
                     'start_date': start_month,
                     'end_date': end_month,
                     'percentage': allocation_percentage,
-                    'id': len(st.session_state.project_allocations)
+                    'id': get_next_allocation_id(st.session_state.project_allocations)
                 }
                 st.session_state.project_allocations.append(allocation)
+                save_project_allocations(st.session_state.project_allocations)
                 st.success(f"✅ Allocation für {selected_employee} auf {selected_project} ({allocation_percentage}%) gespeichert!")
 
 # Display current allocations
@@ -137,6 +124,7 @@ if st.session_state.project_allocations:
                 alloc_str = f"{alloc['employee']} - {alloc['project']} ({alloc['percentage']}%) - {pd.to_datetime(alloc['start_date']).strftime('%Y-%m')} bis {pd.to_datetime(alloc['end_date']).strftime('%Y-%m')}"
                 if alloc_str == selected_to_delete:
                     del st.session_state.project_allocations[i]
+                    save_project_allocations(st.session_state.project_allocations)
                     st.success("✅ Allocation gelöscht!")
                     st.rerun()
                     break

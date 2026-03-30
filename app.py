@@ -5,6 +5,23 @@ from datetime import datetime, timedelta
 import plotly.graph_objects as go
 import numpy as np
 
+from database.session_store import (
+    ensure_session_state,
+    save_component_state,
+    save_dark_mode,
+    save_employee_settings,
+    save_project_allocations,
+    save_team_data,
+)
+from logic.team_service import (
+    build_team_dataframe,
+    calculate_kt_status_from_tenure,
+    calculate_priority_from_tenure,
+    get_kt_status_mapping,
+    update_priorities_from_tenure,
+)
+from ui.theme import get_colors as shared_get_colors, load_theme as shared_load_theme
+
 # SEITENKONFIGURATION - MUSS DER ERSTE STREAMLIT-BEFEHL SEIN
 st.set_page_config(
     page_title="ADC TMS Ressourcendashboard",
@@ -13,318 +30,26 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Initialize dark mode setting
-if 'dark_mode' not in st.session_state:
-    st.session_state.dark_mode = False
+# Centralized initialization for shared application state
+ensure_session_state()
 
 # Color palette function based on theme
 def get_colors():
     """Returns color palette based on dark mode setting"""
-    if st.session_state.dark_mode:
-        return {
-            'primary': '#00d4ff',
-            'primary_dark': '#00a8cc',
-            'background': '#1e1e1e',
-            'surface': '#2d2d2d',
-            'surface_light': '#3a3a3a',
-            'text': '#e0e0e0',
-            'text_secondary': '#a0a0a0',
-            'border': '#404040',
-            'success': '#4ade80',
-            'warning': '#fbbf24',
-            'error': '#ff6b6b',
-            'info': '#3b82f6'
-        }
-    else:
-        return {
-            'primary': '#009999',
-            'primary_dark': '#007777',
-            'background': '#ffffff',
-            'surface': '#f8f9fa',
-            'surface_light': '#e6f7ff',
-            'text': '#333333',
-            'text_secondary': '#666666',
-            'border': '#e0e0e0',
-            'success': '#52c41a',
-            'warning': '#fa8c16',
-            'error': '#ff4d4f',
-            'info': '#1890ff'
-        }
+    return shared_get_colors(st.session_state.dark_mode)
 
 # THEMA
 def load_theme():
     """Load CSS theme based on dark mode setting"""
-    colors = get_colors()
-    st.markdown(f"""
-<style>
-    :root {{
-        --primary: {colors['primary']};
-        --primary-dark: {colors['primary_dark']};
-        --background: {colors['background']};
-        --surface: {colors['surface']};
-        --surface-light: {colors['surface_light']};
-        --text: {colors['text']};
-        --text-secondary: {colors['text_secondary']};
-        --border: {colors['border']};
-        --success: {colors['success']};
-        --warning: {colors['warning']};
-        --error: {colors['error']};
-        --info: {colors['info']};
-    }}
-    
-    body {{
-        background-color: {colors['background']} !important;
-        color: {colors['text']} !important;
-    }}
-    
-    .main {{
-        background-color: {colors['background']} !important;
-    }}
-    
-    .main-header {{
-        font-size: 3rem !important;
-        color: {colors['primary']} !important;
-        text-align: center;
-        margin-bottom: 2rem;
-        font-weight: 700; 
-    }}
-    
-    .metric-card {{
-        background: linear-gradient(135deg, {colors['surface_light']} 0%, {colors['surface']} 100%);
-        padding: 1.5rem;
-        border-radius: 12px;
-        border-left: 5px solid {colors['primary']};
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        transition: transform 0.2s ease;
-        color: {colors['text']};
-    }}
-    
-    .metric-card:hover {{
-        transform: translateY(-3px);
-        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-    }}
-    
-    .critical-alert {{
-        background: linear-gradient(135deg, {colors['surface']} 0%, {colors['surface_light']} 100%);
-        padding: 1.2rem;
-        border-radius: 10px;
-        border-left: 5px solid {colors['info']};
-        margin: 0.8rem 0;
-        box-shadow: 0 3px 5px rgba(0, 0, 0, 0.15);
-        color: {colors['text']} !important;
-    }}
-    
-    .critical-alert h4, .critical-alert p, .critical-alert b {{
-        color: {colors['text']} !important;
-    }}
-    
-    .section-header {{
-        color: {colors['primary']};
-        border-bottom: 2px solid {colors['primary']};
-        padding-bottom: 0.5rem;
-        margin-bottom: 1rem;
-    }}
-    
-    .stButton button {{
-        background: linear-gradient(135deg, {colors['primary']} 0%, {colors['primary_dark']} 100%);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 0.5rem 1rem;
-        font-weight: 600;
-    }}
-    
-    .stButton button:hover {{
-        background: linear-gradient(135deg, {colors['primary_dark']} 0%, #005555 100%);
-        color: white;
-    }}
-    
-    .delete-btn {{
-        background: linear-gradient(135deg, {colors['error']} 0%, #ff7875 100%) !important;
-    }}
-    
-    .delete-btn:hover {{
-        background: linear-gradient(135deg, #ff7875 0%, {colors['error']} 100%) !important;
-    }}
-    
-    .edit-btn {{
-        background: linear-gradient(135deg, {colors['warning']} 0%, #ffa940 100%) !important;
-    }}
-    
-    .edit-btn:hover {{
-        background: linear-gradient(135deg, #ffa940 0%, {colors['warning']} 100%) !important;
-    }}
-    
-    .product-section {{
-        background: linear-gradient(135deg, {colors['primary']} 0%, {colors['primary_dark']} 100%);
-        padding: 2rem;
-        border-radius: 15px;
-        color: white;
-        margin: 1rem 0;
-    }}
-    
-    .product-card {{
-        background: {colors['surface']};
-        border-radius: 12px;
-        padding: 1.5rem;
-        margin: 1rem 0;
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
-        color: {colors['text']};
-    }}
-    
-    .product-card-header {{
-        background: linear-gradient(135deg, {colors['primary']} 0%, {colors['primary_dark']} 100%);
-        color: white;
-        padding: 1rem;
-        border-radius: 10px;
-        margin: -1.5rem -1.5rem 1rem -1.5rem;
-        font-size: 1.3rem;
-        font-weight: 700;
-    }}
-    
-    .component-item {{
-        background: {colors['surface_light']};
-        padding: 1rem;
-        margin: 0.8rem 0;
-        border-left: 4px solid {colors['primary']};
-        border-radius: 5px;
-        color: {colors['text']};
-    }}
-    
-    .responsible-item {{
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0.7rem 0;
-        background: {colors['surface_light']};
-        padding: 0.7rem;
-        margin: 0.5rem 0;
-        border-radius: 5px;
-        color: {colors['text']};
-    }}
-    
-    .responsible-name {{
-        font-weight: 600;
-        color: {colors['text']};
-    }}
-    
-    .critical-warning {{
-        background: {colors['error']}22;
-        border-left: 4px solid {colors['error']};
-        padding: 0.7rem;
-        margin: 0.5rem 0;
-        border-radius: 5px;
-        color: {colors['error']};
-        font-weight: 600;
-    }}
-    
-    .days-to-hire {{
-        background: {colors['warning']};
-        color: white;
-        padding: 0.3rem 0.8rem;
-        border-radius: 20px;
-        font-weight: bold;
-        font-size: 0.9rem;
-    }}
-    
-    .safe-status {{
-        background: {colors['success']};
-        color: white;
-        padding: 0.3rem 0.8rem;
-        border-radius: 20px;
-        font-weight: bold;
-        font-size: 0.9rem;
-    }}
-</style>
-    """, unsafe_allow_html=True)
+    shared_load_theme(st.session_state.dark_mode)
 
 load_theme()
 
-# Initialisiere Session-State für Datenpersistenz
-if 'team_data' not in st.session_state:
-    st.session_state.team_data = [
-        {"name": "Alice Schmidt", "role": "Developer", "employee_type": "Intern", "components": "DOKU", 
-         "start_date": "2020-01-01", "planned_exit": "2026-12-31", "knowledge_transfer_status": "Not Started", "priority": "High", "dob": "1994-05-15", "team": "CS1"},
-        {"name": "Bob Weber", "role": "Tester", "employee_type": "Intern", "components": "Generell", 
-         "start_date": "2021-03-15", "planned_exit": "2029-06-30", "knowledge_transfer_status": "In Progress", "priority": "Critical", "dob": "1976-08-20", "team": "CS2"},
-        {"name": "Charlie Mueller", "role": "System Architect", "employee_type": "Intern", "components": "iBS", 
-         "start_date": "2019-06-01", "planned_exit": "2025-12-30", "knowledge_transfer_status": "Completed", "priority": "Medium", "dob": "1974-03-10", "team": "CS3"},
-        {"name": "Diana Fischer", "role": "Requirements Engineer", "employee_type": "Intern", "components": "TMS", 
-         "start_date": "2022-01-10", "planned_exit": "2031-09-15", "knowledge_transfer_status": "Not Started", "priority": "High", "dob": "1969-11-25", "team": "CS4"},
-        {"name": "Erik Wagner", "role": "Scrum Master", "employee_type": "Intern", "components": "Kundenprojekte", 
-         "start_date": "2021-08-20", "planned_exit": "2035-11-30", "knowledge_transfer_status": "In Progress", "priority": "Medium", "dob": "1997-02-14", "team": "CS5"},
-        {"name": "Markus Becker", "role": "Complaint Manager", "employee_type": "Lead Cost Employee (LCE)", "components": "Generell", "start_date": "2023-02-11", "planned_exit": "2028-12-15", "knowledge_transfer_status": "Not Started", "priority": "Medium", "dob": "1997-07-30", "team": "CS1"},
-        {"name": "Sophie Krause", "role": "Developer", "employee_type": "Lead Cost Employee (LCE)", "components": "ZL", "start_date": "2018-08-30", "planned_exit": "2027-03-12", "knowledge_transfer_status": "Completed", "priority": "High", "dob": "1985-04-05", "team": "CS2"},
-        {"name": "Julia Wagner", "role": "Developer", "employee_type": "Lead Cost Employee (LCE)", "components": "iBS", "start_date": "2021-05-18", "planned_exit": "2026-08-29", "knowledge_transfer_status": "In Progress", "priority": "Critical", "dob": "1990-09-12", "team": "CS3"},
-        {"name": "Lars Richter", "role": "Test Automation", "employee_type": "Extern", "components": "Testing, iBS", "start_date": "2019-11-04", "planned_exit": "2025-11-04", "knowledge_transfer_status": "Not Started", "priority": "Medium", "dob": "1981-12-18", "team": "CS4"},
-        {"name": "Heike Zimmermann", "role": "Validierer", "employee_type": "Extern", "components": "Kundenprojekte", "start_date": "2017-03-14", "planned_exit": "2026-09-01", "knowledge_transfer_status": "Completed", "priority": "High", "dob": "1973-06-22", "team": "CS5"} 
-    ]
-
-if 'editing_index' not in st.session_state:
-    st.session_state.editing_index = None
-
-def get_kt_status_mapping():
-    """Returns mapping between German display names and English storage values"""
-    return {
-        "Nicht gestartet": "Not Started",
-        "In Bearbeitung": "In Progress",
-        "Abgeschlossen": "Completed",
-        "Not Started": "Nicht gestartet",
-        "In Progress": "In Bearbeitung",
-        "Completed": "Abgeschlossen"
-    }
-
-def calculate_priority_from_tenure(start_date_str):
-    """
-    Calculate priority based on tenure:
-    - Less than 6 months: High
-    - 6 months to 2 years: Medium
-    - Over 2 years: Low
-    """
-    start_date = pd.to_datetime(start_date_str)
-    tenure_days = (pd.Timestamp.today() - start_date).days
-    
-    if tenure_days < 180:  # Less than 6 months
-        return "High"
-    elif tenure_days < 730:  # Less than 2 years
-        return "Medium"
-    else:  # 2+ years
-        return "Low"
-
-def calculate_kt_status_from_tenure(start_date_str):
-    """
-    Calculate knowledge transfer status based on tenure:
-    - Less than 6 months: Not Started
-    - 6 months to 2 years: In Progress
-    - Over 2 years: Completed
-    """
-    start_date = pd.to_datetime(start_date_str)
-    tenure_days = (pd.Timestamp.today() - start_date).days
-    
-    if tenure_days < 180:  # Less than 6 months
-        return "Not Started"
-    elif tenure_days < 730:  # Less than 2 years
-        return "In Progress"
-    else:  # 2+ years
-        return "Completed"
-
-def update_priorities_from_tenure():
-    """Update all team members' priorities and knowledge transfer status based on their tenure.
-    Only update if not manually overridden."""
-    for member in st.session_state.team_data:
-        # Check if this member has manually set values by checking if there's a manual override flag
-        # If not present, set to auto-calculated (backward compatibility)
-        if 'manual_override' not in member:
-            member['manual_override'] = False
-        
-        # Only update if not manually overridden
-        if not member.get('manual_override', False):
-            member['priority'] = calculate_priority_from_tenure(member['start_date'])
-            member['knowledge_transfer_status'] = calculate_kt_status_from_tenure(member['start_date'])
+# Shared defaults now live in `database.session_store`.
 
 def main():
     # Update priorities based on tenure at the start of each run
-    update_priorities_from_tenure()
+    update_priorities_from_tenure(st.session_state.team_data)
     
     # DARK MODE TOGGLE IN SIDEBAR
     st.sidebar.markdown("---")
@@ -334,6 +59,7 @@ def main():
     with cols[1]:
         if st.sidebar.button("🌙" if not st.session_state.dark_mode else "☀️", key="theme_toggle", use_container_width=True):
             st.session_state.dark_mode = not st.session_state.dark_mode
+            save_dark_mode(st.session_state.dark_mode)
             load_theme()
             st.rerun()
     
@@ -357,20 +83,8 @@ def main():
         st.session_state.component_transfer_times = {}
 
     
-    # Convert to DataFrame
-    df = pd.DataFrame(st.session_state.team_data)
-    if not df.empty:
-        if 'team' not in df.columns:
-            df['team'] = "Unassigned"
-        df['planned_exit'] = pd.to_datetime(df['planned_exit'])
-        df['start_date'] = pd.to_datetime(df['start_date'])
-        df['dob'] = pd.to_datetime(df['dob'])
-        df['age'] = pd.Timestamp.today().year - df['dob'].dt.year - ((pd.Timestamp.today().month < df['dob'].dt.month) | ((pd.Timestamp.today().month == df['dob'].dt.month) & (pd.Timestamp.today().day < df['dob'].dt.day)))
-        df['days_until_exit'] = (df['planned_exit'] - pd.Timestamp.today()).dt.days
-        df['tenure_days'] = (pd.Timestamp.today() - df['start_date']).dt.days
-    else:
-        # Create empty dataframe with expected columns if no data
-        df = pd.DataFrame(columns=['name', 'role', 'employee_type', 'components', 'start_date', 'planned_exit', 'knowledge_transfer_status', 'priority', 'team', 'dob'])
+    # Convert to DataFrame via the logic layer
+    df = build_team_dataframe(st.session_state.team_data)
     
     # KEY METRICS ROW
     colors = get_colors()
@@ -572,6 +286,7 @@ def main():
                     with col_del:
                         if st.button("🗑️ Delete", key=f"delete_{i}", use_container_width=True):
                             del st.session_state.team_data[i]
+                            save_team_data(st.session_state.team_data)
                             st.rerun()
     
     # EDIT FORM (appears when editing)
@@ -633,6 +348,7 @@ def main():
                     "team": edit_team,
                     "manual_override": True
                 }
+                save_team_data(st.session_state.team_data)
                 st.session_state.editing_index = None
                 st.rerun()
             
@@ -1157,6 +873,7 @@ def main():
                     "manual_override": True
                 }
                 st.session_state.team_data.append(new_member)
+                save_team_data(st.session_state.team_data)
                 st.rerun()
             else:
                 st.sidebar.error("Please fill at least Name and Rolle")
@@ -1184,6 +901,7 @@ def main():
                 st.session_state.component_products[component_name] = product_name
                 st.session_state.component_requirements[component_name] = int(required_count)
                 st.session_state.component_transfer_times[component_name] = int(transfer_time)
+                save_component_state()
                 st.sidebar.success(f"✅ '{component_name}' ({product_name}) wurde {', '.join(responsible_persons)} zugewiesen.")
             else:
                 st.sidebar.error("Bitte geben Sie einen Namen und wählen Sie eine verantwortliche Person aus.")
@@ -1203,7 +921,17 @@ def main():
     
     if st.sidebar.button("🗑️ Alle Daten löschen", use_container_width=True):
         st.session_state.team_data = []
+        st.session_state.project_allocations = []
+        st.session_state.employee_settings = {}
+        st.session_state.component_map = {}
+        st.session_state.component_requirements = {}
+        st.session_state.component_transfer_times = {}
+        st.session_state.component_products = {}
         st.session_state.editing_index = None
+        save_team_data([])
+        save_project_allocations([])
+        save_employee_settings({})
+        save_component_state()
         st.rerun()
     
     # SIDEBAR STATS

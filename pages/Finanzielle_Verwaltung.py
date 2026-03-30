@@ -3,6 +3,15 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime
 
+from database.session_store import (
+    ensure_session_state,
+    save_budget_data,
+    save_employee_settings,
+)
+from logic.finance_service import calculate_employee_cost, calculate_employee_fte
+from logic.team_service import build_team_dataframe
+from ui.theme import load_theme
+
 # Page config
 st.set_page_config(
     page_title="Finanzielle Verwaltung",
@@ -10,50 +19,8 @@ st.set_page_config(
     layout="wide"
 )
 
-# Initialize financial data
-if 'budget_data' not in st.session_state:
-    st.session_state.budget_data = {
-        "Intern": {"monthly_cost": 1500, "yearly_budget": 18000, "hourly_rate": 75, "weekly_hours": 35},
-        "Lead Cost Employee (LCE)": {"monthly_cost": 5000, "yearly_budget": 60000, "hourly_rate": 0, "weekly_hours": 0},
-        "Extern": {"monthly_cost": 7000, "yearly_budget": 84000, "hourly_rate": 0, "weekly_hours": 0}
-    }
-
-# Initialize individual employee settings if not exists
-if 'employee_settings' not in st.session_state:
-    st.session_state.employee_settings = {}
-
-# Check if team_data exists
-if 'team_data' not in st.session_state:
-    st.error("Teamdaten nicht gefunden. Bitte zuerst die Organisationsseite besuchen.")
-    st.stop()
-
-# Helper function to calculate employee costs
-def calculate_employee_cost(emp_name, emp_type, budget_data, employee_settings):
-    """Calculate monthly and yearly costs for an employee."""
-    if emp_type == "Intern" and emp_name in employee_settings:
-        settings = employee_settings[emp_name]
-        hr = settings.get('hourly_rate', budget_data[emp_type]['hourly_rate'])
-        wh = settings.get('weekly_hours', budget_data[emp_type]['weekly_hours'])
-        monthly = (wh * hr * 52) / 12
-        yearly = wh * hr * 52
-    else:
-        monthly = budget_data.get(emp_type, {}).get('monthly_cost', 0)
-        yearly = budget_data.get(emp_type, {}).get('yearly_budget', 0)
-    return monthly, yearly
-
-# Helper function to calculate FTE
-def calculate_employee_fte(emp_name, emp_type, budget_data, employee_settings):
-    """Calculate FTE (Full-Time Equivalent) for an employee."""
-    if emp_type == "Intern":
-        if emp_name in employee_settings:
-            wh = employee_settings[emp_name].get('weekly_hours', budget_data[emp_type]['weekly_hours'])
-        else:
-            wh = budget_data[emp_type]['weekly_hours']
-        # Assuming 35 hours/week is full-time
-        return wh / 35 if wh > 0 else 0
-    else:
-        # Assuming other types are full-time
-        return 1.0
+ensure_session_state()
+load_theme(st.session_state.dark_mode)
 
 st.title("💰 Finanzielle Verwaltung")
 st.markdown("Budgetverfolgung und -berechnung für die Abteilung")
@@ -63,7 +30,7 @@ st.markdown("---")
 st.markdown("### 📊 Budgetübersicht")
 
 # Calculate current costs
-df = pd.DataFrame(st.session_state.team_data)
+df = build_team_dataframe(st.session_state.team_data)
 if not df.empty:
     employee_counts = df['employee_type'].value_counts()
     total_monthly_cost = 0
@@ -196,13 +163,26 @@ st.sidebar.markdown("### ⚙️ Budget anpassen")
 with st.sidebar.form("adjust_budget"):
     st.markdown("#### Kategorien-Standard Kosten")
     emp_type = st.selectbox("Mitarbeitertyp", list(st.session_state.budget_data.keys()))
-    new_monthly = st.number_input("Monatliche Kosten (€)", value=st.session_state.budget_data[emp_type]["monthly_cost"], min_value=0)
-    new_yearly = st.number_input("Jährliche Kosten (€)", value=st.session_state.budget_data[emp_type]["yearly_budget"], min_value=0)
+    current_monthly = float(st.session_state.budget_data[emp_type]["monthly_cost"])
+    current_yearly = float(st.session_state.budget_data[emp_type]["yearly_budget"])
+    new_monthly = st.number_input(
+        "Monatliche Kosten (€)",
+        value=current_monthly,
+        min_value=0.0,
+        step=100.0,
+    )
+    new_yearly = st.number_input(
+        "Jährliche Kosten (€)",
+        value=current_yearly,
+        min_value=0.0,
+        step=100.0,
+    )
     
     adjust_submitted = st.form_submit_button("💾 Aktualisieren")
     if adjust_submitted:
         st.session_state.budget_data[emp_type]["monthly_cost"] = new_monthly
         st.session_state.budget_data[emp_type]["yearly_budget"] = new_yearly
+        save_budget_data(st.session_state.budget_data)
         st.rerun()
 
 # Individual Employee Settings for Interns
@@ -257,6 +237,7 @@ if not df.empty:
                     'hourly_rate': emp_hourly_rate,
                     'weekly_hours': emp_weekly_hours
                 }
+                save_employee_settings(st.session_state.employee_settings)
                 st.rerun()
     else:
         st.sidebar.info("Keine internen Mitarbeiter vorhanden")
