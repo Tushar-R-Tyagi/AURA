@@ -17,7 +17,7 @@ from logic.allocation_service import (
     validate_allocation_dates,
 )
 from logic.team_service import build_team_dataframe
-from ui.theme import load_theme
+from ui.theme import load_theme, render_sidebar_navigation
 
 # Page config
 st.set_page_config(
@@ -27,7 +27,8 @@ st.set_page_config(
 )
 
 ensure_session_state()
-load_theme(st.session_state.dark_mode)
+load_theme()
+render_sidebar_navigation()
 
 PROJECTS = DEFAULT_PROJECTS
 PROJECT_COLORS = DEFAULT_PROJECT_COLORS

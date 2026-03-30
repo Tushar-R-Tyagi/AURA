@@ -10,7 +10,7 @@ from database.session_store import (
 )
 from logic.finance_service import calculate_employee_cost, calculate_employee_fte
 from logic.team_service import build_team_dataframe
-from ui.theme import load_theme
+from ui.theme import load_theme, render_sidebar_navigation
 
 # Page config
 st.set_page_config(
@@ -20,7 +20,8 @@ st.set_page_config(
 )
 
 ensure_session_state()
-load_theme(st.session_state.dark_mode)
+load_theme()
+render_sidebar_navigation()
 
 st.title("💰 Finanzielle Verwaltung")
 st.markdown("Budgetverfolgung und -berechnung für die Abteilung")

@@ -5,24 +5,27 @@ from __future__ import annotations
 import streamlit as st
 
 
-def get_colors(dark_mode: bool = False) -> dict[str, str]:
-    """Return the color palette based on the active theme."""
-    if dark_mode:
-        return {
-            "primary": "#00d4ff",
-            "primary_dark": "#00a8cc",
-            "background": "#1e1e1e",
-            "surface": "#2d2d2d",
-            "surface_light": "#3a3a3a",
-            "text": "#e0e0e0",
-            "text_secondary": "#a0a0a0",
-            "border": "#404040",
-            "success": "#4ade80",
-            "warning": "#fbbf24",
-            "error": "#ff6b6b",
-            "info": "#3b82f6",
-        }
+def render_navigation_link(container, page_path: str, label: str, icon: str, help_text: str) -> None:
+    """Render a page link with a text fallback."""
+    link_label = f"{icon} {label}"
+    if hasattr(container, "page_link"):
+        container.page_link(page_path, label=link_label, use_container_width=True, help=help_text)
+    else:
+        container.markdown(f"**{link_label}**  \n{help_text}")
 
+
+def render_sidebar_navigation() -> None:
+    """Render the single sidebar navigation block used across the app."""
+    st.sidebar.markdown("#### 🧭 Navigation")
+    render_navigation_link(st.sidebar, "app.py", "Executive Dashboard", "🏠", "Strategische Übersicht und Management-KPIs")
+    render_navigation_link(st.sidebar, "pages/Stammdaten_Management.py", "Stammdaten Management", "🛠️", "Team-, Produkt- und Komponentendaten")
+    render_navigation_link(st.sidebar, "pages/Projekt_Allocation.py", "Projekt-Allocation", "📅", "Kapazitäten und Allokationen")
+    render_navigation_link(st.sidebar, "pages/Finanzielle_Verwaltung.py", "Finanzielle Verwaltung", "💰", "Budget und Kosten")
+    st.sidebar.markdown("---")
+
+
+def get_colors(dark_mode: bool = False) -> dict[str, str]:
+    """Return the shared light palette; `dark_mode` is ignored for compatibility."""
     return {
         "primary": "#009999",
         "primary_dark": "#007777",
@@ -40,8 +43,8 @@ def get_colors(dark_mode: bool = False) -> dict[str, str]:
 
 
 def load_theme(dark_mode: bool = False) -> None:
-    """Inject shared CSS theme into the current Streamlit page."""
-    colors = get_colors(dark_mode)
+    """Inject the shared light executive theme into the current Streamlit page."""
+    colors = get_colors()
     st.markdown(
         f"""
 <style>
@@ -67,6 +70,11 @@ def load_theme(dark_mode: bool = False) -> None:
 
     .main {{
         background-color: {colors['background']} !important;
+    }}
+
+    [data-testid="stSidebarNav"],
+    [data-testid="stSidebarNavSeparator"] {{
+        display: none !important;
     }}
 
     .main-header {{

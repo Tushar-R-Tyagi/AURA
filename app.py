@@ -8,7 +8,6 @@ import numpy as np
 from database.session_store import (
     ensure_session_state,
     save_component_state,
-    save_dark_mode,
     save_employee_settings,
     save_project_allocations,
     save_team_data,
@@ -20,11 +19,15 @@ from logic.team_service import (
     get_kt_status_mapping,
     update_priorities_from_tenure,
 )
-from ui.theme import get_colors as shared_get_colors, load_theme as shared_load_theme
+from ui.theme import (
+    get_colors as shared_get_colors,
+    load_theme as shared_load_theme,
+    render_sidebar_navigation as shared_render_sidebar_navigation,
+)
 
 # SEITENKONFIGURATION - MUSS DER ERSTE STREAMLIT-BEFEHL SEIN
 st.set_page_config(
-    page_title="ADC TMS Ressourcendashboard",
+    page_title="AURA Executive Dashboard",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -33,15 +36,15 @@ st.set_page_config(
 # Centralized initialization for shared application state
 ensure_session_state()
 
-# Color palette function based on theme
+# Color palette function based on the fixed app theme
 def get_colors():
-    """Returns color palette based on dark mode setting"""
-    return shared_get_colors(st.session_state.dark_mode)
+    """Return the shared executive color palette."""
+    return shared_get_colors()
 
 # THEMA
 def load_theme():
-    """Load CSS theme based on dark mode setting"""
-    shared_load_theme(st.session_state.dark_mode)
+    """Load the shared light executive theme."""
+    shared_load_theme()
 
 load_theme()
 
@@ -121,30 +124,22 @@ def get_active_component_assignments(frame: pd.DataFrame, component_name: str, r
     return matches
 
 
+def render_sidebar_navigation() -> None:
+    """Render the single sidebar navigation block for the dashboard."""
+    shared_render_sidebar_navigation()
+
+
 def main():
     sync_master_data_to_legacy_state()
 
     # Update priorities based on tenure at the start of each run
     update_priorities_from_tenure(st.session_state.team_data)
-    
-    # DARK MODE TOGGLE IN SIDEBAR
-    st.sidebar.markdown("---")
-    cols = st.sidebar.columns([3, 1])
-    with cols[0]:
-        st.sidebar.markdown("#### 🎨 Theme")
-    with cols[1]:
-        if st.sidebar.button("🌙" if not st.session_state.dark_mode else "☀️", key="theme_toggle", use_container_width=True):
-            st.session_state.dark_mode = not st.session_state.dark_mode
-            save_dark_mode(st.session_state.dark_mode)
-            load_theme()
-            st.rerun()
-    
-    st.sidebar.markdown("---")
+    render_sidebar_navigation()
     
     # KOPFZEILE
-    st.markdown('<h1 class="main-header">🏢 AURA </h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">🏢 AURA Executive Dashboard</h1>', unsafe_allow_html=True)
     colors = get_colors()
-    st.markdown(f'<p style="text-align: center; font-size: 1.2rem; color: {colors["text_secondary"]};">Automated Resource Analytics</p>', unsafe_allow_html=True)
+    st.markdown(f'<p style="text-align: center; font-size: 1.2rem; color: {colors["text_secondary"]};">Leadership view for capacity, continuity and staffing risk</p>', unsafe_allow_html=True)
 
     
     # Initialize component map
@@ -161,53 +156,115 @@ def main():
     
     # Convert to DataFrame via the logic layer
     df = build_team_dataframe(st.session_state.team_data)
-    
-    # KEY METRICS ROW
+    critical_cases_df = df[df['days_until_exit'] < 180].sort_values('days_until_exit') if not df.empty else pd.DataFrame()
+    component_rows = []
+
+    if 'component_map' in st.session_state and st.session_state.component_map:
+        today = pd.Timestamp.today().normalize()
+        for component, responsible in st.session_state.component_map.items():
+            responsible_list = responsible if isinstance(responsible, (list, tuple)) else [responsible]
+            comp_key = component.strip().lower()
+            active_count = 0
+
+            for _, row in df.iterrows():
+                name = str(row.get('name', '')).strip()
+                comps_field = row.get('components', '') or ''
+                comps = [c.strip().lower() for c in str(comps_field).split(',') if c.strip()]
+
+                try:
+                    sd = pd.to_datetime(row['start_date'])
+                except Exception:
+                    continue
+                pe = pd.to_datetime(row.get('planned_exit'))
+
+                started = sd <= today
+                not_left = pd.isna(pe) or (pe > today)
+                assigned = (comp_key in comps) or (name in responsible_list)
+                if assigned and started and not_left:
+                    active_count += 1
+
+            required = int(st.session_state.component_requirements.get(component, 1))
+            if active_count == 0:
+                status = "UNBESETZT"
+            elif active_count < required:
+                status = "UNTERBESETZT - SINGLE" if active_count == 1 else "UNTERBESETZT"
+            else:
+                status = "OK"
+
+            component_rows.append(
+                {
+                    "Komponente": component,
+                    "Verantwortlich": ", ".join(responsible_list),
+                    "Aktive Ressourcen": active_count,
+                    "Benötigt": required,
+                    "Status": status,
+                }
+            )
+
+    comp_df = pd.DataFrame(component_rows).sort_values(["Status", "Komponente"], ascending=[True, True]) if component_rows else pd.DataFrame()
+
+    total_members = len(df)
+    critical_cases = len(critical_cases_df)
+    urgent_cases = len(df[df['days_until_exit'] < 90]) if not df.empty else 0
+    completed_kt = len(df[df['knowledge_transfer_status'] == "Completed"]) if not df.empty else 0
+    kt_completion_rate = int((completed_kt / total_members) * 100) if total_members else 0
+    staffing_gap_count = len(comp_df[comp_df['Status'] != 'OK']) if not comp_df.empty else 0
+
+    # EXECUTIVE SNAPSHOT
     colors = get_colors()
     st.markdown("---")
-    st.markdown('<h3 class="section-header">📊 Leistungskennzahlen</h3>', unsafe_allow_html=True)
-    
+    st.caption(f"Stand: {pd.Timestamp.today().strftime('%d.%m.%Y')} • Fokus auf Kapazität, Risiko und Kontinuität")
+    st.markdown('<h3 class="section-header">📊 Executive Snapshot</h3>', unsafe_allow_html=True)
+
     col1, col2, col3, col4 = st.columns(4)
-    
+
     with col1:
-        total_members = len(df)
         st.markdown(f"""
         <div class="metric-card">
             <h3 style="margin:0; color: {colors['primary']};">👥</h3>
             <h2 style="margin:0; color: {colors['primary']};">{total_members}</h2>
-            <p style="margin:0; color: {colors['text_secondary']};">Gesamtanzahl Teammitglieder</p>
+            <p style="margin:0; color: {colors['text_secondary']};">Aktive Teammitglieder</p>
         </div>
         """, unsafe_allow_html=True)
-    
+
     with col2:
-        critical_cases = len(df[df['days_until_exit'] < 180]) if not df.empty else 0
         st.markdown(f"""
         <div class="metric-card">
             <h3 style="margin:0; color: {colors['info']};">🚨</h3>
             <h2 style="margin:0; color: {colors['info']};">{critical_cases}</h2>
-            <p style="margin:0; color: {colors['text_secondary']};">Kritische Exits</p>
+            <p style="margin:0; color: {colors['text_secondary']};">Kritische Exits (&lt; 180 Tage)</p>
         </div>
         """, unsafe_allow_html=True)
-    
+
     with col3:
-        completed_kt = len(df[df['knowledge_transfer_status'] == "Completed"]) if not df.empty else 0
         st.markdown(f"""
         <div class="metric-card">
             <h3 style="margin:0; color: {colors['success']};">✅</h3>
-            <h2 style="margin:0; color: {colors['success']};">{completed_kt}/{total_members}</h2>
-            <p style="margin:0; color: {colors['text_secondary']};">Wissensübergabe abgeschlossen</p>
+            <h2 style="margin:0; color: {colors['success']};">{kt_completion_rate}%</h2>
+            <p style="margin:0; color: {colors['text_secondary']};">KT-Abschlussquote</p>
         </div>
         """, unsafe_allow_html=True)
-    
+
     with col4:
-        avg_tenure = int(df['tenure_days'].mean() / 365) if not df.empty and 'tenure_days' in df.columns else 0
         st.markdown(f"""
         <div class="metric-card">
-            <h3 style="margin:0; color: {colors['warning']};">📅</h3>
-            <h2 style="margin:0; color: {colors['warning']};">{avg_tenure} yrs</h2>
-            <p style="margin:0; color: {colors['text_secondary']};">Durchschnittliche Teamzugehörigkeit</p>
+            <h3 style="margin:0; color: {colors['warning']};">🧩</h3>
+            <h2 style="margin:0; color: {colors['warning']};">{staffing_gap_count}</h2>
+            <p style="margin:0; color: {colors['text_secondary']};">Komponenten mit Besetzungsrisiko</p>
         </div>
         """, unsafe_allow_html=True)
+
+    top_risk = "Keine unmittelbare Eskalation" if critical_cases_df.empty else f"{critical_cases_df.iloc[0]['name']} ({critical_cases_df.iloc[0]['role']})"
+    continuity_message = "Alle Kernkomponenten sind aktuell ausreichend besetzt." if staffing_gap_count == 0 else f"{staffing_gap_count} Komponenten brauchen kurzfristige Aufmerksamkeit."
+    alert_border = colors['success'] if staffing_gap_count == 0 and urgent_cases == 0 else colors['warning']
+    st.markdown(f"""
+    <div style="border-left: 6px solid {alert_border}; padding: 1rem 1.2rem; border-radius: 12px; background: rgba(77, 208, 225, 0.08); margin-top: 0.5rem;">
+        <h4 style="margin: 0 0 0.6rem 0;">🎯 Executive Briefing</h4>
+        <p style="margin: 0 0 0.35rem 0;"><b>Top-Risiko:</b> {top_risk}</p>
+        <p style="margin: 0 0 0.35rem 0;"><b>Kontinuität:</b> {continuity_message}</p>
+        <p style="margin: 0;"><b>Heute priorisieren:</b> {urgent_cases} hochkritische Fälle unter 90 Tagen.</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     # CRITICAL ALERTS SECTION  
     st.markdown("---")
@@ -258,58 +315,7 @@ def main():
         st.info("ℹ️ Keine Teamdaten verfügbar. Fügen Sie Teammitglieder hinzu, um kritische Warnungen zu sehen.")
     
     # COMPONENT-SPECIFIC CRITICAL ALERTS (Color-coded)
-    if 'component_map' in st.session_state and st.session_state.component_map:
-        # Build component status table with required staffing vs active resources
-        component_rows = []
-        today = pd.Timestamp.today().normalize()
-        for component, responsible in st.session_state.component_map.items():
-            # Robust active count:
-            # - Count rows where member.components contains the component OR member.name is in responsible list
-            # normalize responsible to a list
-            responsible_list = responsible if isinstance(responsible, (list, tuple)) else [responsible]
-            # - Member is active when start_date <= today AND (planned_exit is NaT or planned_exit > today)
-            comp_key = component.strip().lower()
-            active_count = 0
-            for _, row in df.iterrows():
-                # normalize fields
-                name = str(row.get('name', '')).strip()
-                comps_field = row.get('components', '') or ''
-                comps = [c.strip().lower() for c in str(comps_field).split(',') if c.strip()]
-
-                # parse dates safely
-                try:
-                    sd = pd.to_datetime(row['start_date'])
-                except Exception:
-                    continue
-                pe = pd.to_datetime(row.get('planned_exit'))
-
-                started = sd <= today
-                not_left = pd.isna(pe) or (pe > today)
-
-                assigned = (comp_key in comps) or (name in responsible_list)
-                if assigned and started and not_left:
-                    active_count += 1
-
-            required = int(st.session_state.component_requirements.get(component, 1))
-
-            if active_count == 0:
-                status = "UNBESETZT"
-            elif active_count < required:
-                # Single resource available -> critical (red)
-                status = "UNTERBESETZT - SINGLE" if active_count == 1 else "UNTERBESETZT"
-            else:
-                status = "OK"
-
-            component_rows.append({
-                "Komponente": component,
-                "Verantwortlich": ", ".join(responsible_list),
-                "Aktive Ressourcen": active_count,
-                "Benötigt": required,
-                "Status": status
-            })
-
-        comp_df = pd.DataFrame(component_rows).sort_values(["Status", "Komponente"], ascending=[True, True])
-
+    if not comp_df.empty:
         def status_style(val):
             if val == "UNBESETZT":
                 return "background-color: #ff4d4f; color: white; font-weight: bold"
@@ -327,125 +333,6 @@ def main():
     else:
         st.info("ℹ️ Keine Komponenten zugewiesen.")
 
-    # EDIT/DELETE INTERFACE
-    st.markdown("---")
-    st.markdown('<h3 class="section-header">✏️ Teammitglieder verwalten</h3>', unsafe_allow_html=True)
-    
-    if not df.empty:
-        # Display each team member with edit/delete options
-        for i, member in enumerate(st.session_state.team_data):
-            with st.expander(f"👤 {member['name']} - {member['role']}", expanded=False):
-                col1, col2 = st.columns([3, 1])
-                
-                with col1:
-                    st.write(f"**Components:** {member['components']}")
-                    st.write(f"**Team:** {member.get('team', 'Unassigned')}")
-                    # derive components where this member is one of the responsibles
-                    assigned_components = []
-                    for comp, responsibles in st.session_state.component_map.items():
-                        resp_list = responsibles if isinstance(responsibles, (list, tuple)) else [responsibles]
-                        if member['name'] in resp_list:
-                            assigned_components.append(comp)
-                    if assigned_components:
-                        st.write(f"**Zugewiesene Komponenten:** {', '.join(assigned_components)}")
-
-                    st.write(f"**Startdatum:** {member['start_date']}")
-                    st.write(f"**Planned Exit:** {member['planned_exit']}")
-                    st.write(f"**Wissensübergabe:** {member['knowledge_transfer_status']}")
-                    st.write(f"**Priorität:** {member['priority']}")
-                
-                with col2:
-                    col_edit, col_del = st.columns(2)
-                    with col_edit:
-                        if st.button("✏️ Edit", key=f"edit_{i}", use_container_width=True):
-                            st.session_state.editing_index = i
-                    with col_del:
-                        if st.button("🗑️ Delete", key=f"delete_{i}", use_container_width=True):
-                            del st.session_state.team_data[i]
-                            save_team_data(st.session_state.team_data)
-                            st.rerun()
-    
-    # EDIT FORM (appears when editing)
-    if st.session_state.editing_index is not None:
-        st.markdown("---")
-        st.markdown('<h3 class="section-header">📝 Teammitglied bearbeiten</h3>', unsafe_allow_html=True)
-        
-        edit_index = st.session_state.editing_index
-        member = st.session_state.team_data[edit_index]
-        
-        existing_settings = st.session_state.employee_settings.get(member['name'], {})
-        default_weekly_hours = int(existing_settings.get('weekly_hours', st.session_state.budget_data.get(member.get('employee_type', 'Intern'), {}).get('weekly_hours', 35) or 35))
-        default_hourly_rate = float(existing_settings.get('hourly_rate', st.session_state.budget_data.get(member.get('employee_type', 'Intern'), {}).get('hourly_rate', 0) or 0))
-
-        with st.form(f"edit_form_{edit_index}"):
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                edit_name = st.text_input("Vollständiger Name", value=member['name'])
-                edit_role = st.text_input("Rolle/Position", value=member['role'])
-                edit_employee_type = st.selectbox("Mitarbeitertyp", ["Intern", "Lead Cost Employee (LCE)", "Extern"], index=["Intern", "Lead Cost Employee (LCE)", "Extern"].index(member.get('employee_type', 'Intern')))
-                edit_components = st.text_area("Wichtige Komponenten/Verantwortlichkeiten", value=member['components'])
-                edit_weekly_hours = st.number_input("Kontakt-/Wochenstunden", min_value=0, max_value=80, value=default_weekly_hours, step=1)
-                edit_hourly_rate = st.number_input("Stundensatz (€/h)", min_value=0.0, value=default_hourly_rate, step=0.5)
-            
-            with col2:
-                edit_start_date = st.date_input("Startdatum", value=datetime.strptime(member['start_date'], "%Y-%m-%d"))
-                edit_planned_exit = st.date_input("Geplantes Austrittsdatum", value=datetime.strptime(member['planned_exit'], "%Y-%m-%d"))
-                # Display and allow editing of knowledge transfer status
-                calculated_kt_status = calculate_kt_status_from_tenure(member['start_date'])
-                kt_mapping = get_kt_status_mapping()
-                kt_options = ["Nicht gestartet", "In Bearbeitung", "Abgeschlossen"]
-                current_kt_value = member.get('knowledge_transfer_status', calculated_kt_status)
-                current_kt_display = kt_mapping.get(current_kt_value, current_kt_value)
-                edit_kt_status_display = st.selectbox("Status der Wissensübergabe", kt_options, index=kt_options.index(current_kt_display) if current_kt_display in kt_options else 0)
-                edit_kt_status = kt_mapping.get(edit_kt_status_display, edit_kt_status_display)
-                # Display and allow editing of priority
-                calculated_priority = calculate_priority_from_tenure(member['start_date'])
-                priority_options = ["Low", "Medium", "High", "Critical"]
-                edit_priority = st.selectbox("Prioritätsstufe", priority_options, index=priority_options.index(member.get('priority', calculated_priority)) if member.get('priority', calculated_priority) in priority_options else 0)
-                # Geburtsdatum hinzufügen / editieren
-                edit_dob = st.date_input("Geburtsdatum", value=datetime.strptime(member.get('dob', '1990-01-01'), "%Y-%m-%d"))
-                # Team auswählen
-                teams = ["CS1", "CS2", "CS3", "CS4", "CS5", "Unassigned"]
-                edit_team = st.selectbox("Team", teams, index=teams.index(member.get('team', 'Unassigned')))
-            
-            col_save, col_cancel = st.columns(2)
-            with col_save:
-                save_clicked = st.form_submit_button("💾 Änderungen speichern", use_container_width=True)
-            with col_cancel:
-                cancel_clicked = st.form_submit_button("❌ Abbrechen", use_container_width=True)
-            
-            if save_clicked:
-                previous_name = member['name']
-
-                # Use manually entered values for priority and knowledge transfer status
-                st.session_state.team_data[edit_index] = {
-                    "name": edit_name,
-                    "role": edit_role,
-                    "employee_type": edit_employee_type,
-                    "components": edit_components,
-                    "start_date": edit_start_date.strftime("%Y-%m-%d"),
-                    "planned_exit": edit_planned_exit.strftime("%Y-%m-%d"),
-                    "knowledge_transfer_status": edit_kt_status,
-                    "priority": edit_priority,
-                    "dob": edit_dob.strftime("%Y-%m-%d"),
-                    "team": edit_team,
-                    "manual_override": True
-                }
-                if previous_name != edit_name and previous_name in st.session_state.employee_settings:
-                    del st.session_state.employee_settings[previous_name]
-                st.session_state.employee_settings[edit_name] = {
-                    "hourly_rate": float(edit_hourly_rate),
-                    "weekly_hours": int(edit_weekly_hours),
-                }
-                save_team_data(st.session_state.team_data)
-                save_employee_settings(st.session_state.employee_settings)
-                st.session_state.editing_index = None
-                st.rerun()
-            
-            if cancel_clicked:
-                st.session_state.editing_index = None
-                st.rerun()
     
     # VISUALIZATIONS ROW
     if not df.empty:
@@ -899,290 +786,13 @@ def main():
         </div>
         """, unsafe_allow_html=True)
 
-    # DATA TABLE WITH FILTERS
-    if not df.empty:
-        st.markdown("---")
-        st.markdown('<h3 class="section-header">👥 Detaillierte Teamübersicht</h3>', unsafe_allow_html=True)
-        
-        # Filters
-        col1, col2, col3, col4, col5 = st.columns(5)
-        with col1:
-            status_filter = st.multiselect("Wissensübergabe", 
-                                         options=df['knowledge_transfer_status'].unique(),
-                                         default=df['knowledge_transfer_status'].unique())
-        with col2:
-            priority_filter = st.multiselect("Prioritätsstufe",
-                                           options=df['priority'].unique(),
-                                           default=df['priority'].unique())
-        with col3:
-            role_filter = st.multiselect("Rolle",
-                                       options=df['role'].unique(),
-                                       default=df['role'].unique())
-        with col4:
-            days_filter = st.slider("Tage bis Austritt", 
-                                  min_value=0, 
-                                  max_value=int(df['days_until_exit'].max()) + 100 if not df.empty else 1000,
-                                  value=(0, 1000))
-        with col5:
-            team_options = sorted(df['team'].unique())
-            team_filter = st.multiselect("Team", options=team_options, default=team_options)
-        
-        # filters
-        filtered_df = df[
-            (df['knowledge_transfer_status'].isin(status_filter)) &
-            (df['priority'].isin(priority_filter)) &
-            (df['role'].isin(role_filter)) &
-            (df['days_until_exit'] >= days_filter[0]) &
-            (df['days_until_exit'] <= days_filter[1]) &
-            (df['team'].isin(team_filter))
-        ]
-        
-        # Display filtered table
-        display_df = filtered_df[['name', 'role', 'employee_type', 'team', 'components', 'priority', 'days_until_exit', 'knowledge_transfer_status']].copy()
-        display_df.columns = ['Name', 'Rolle', 'Mitarbeitertyp', 'Team', 'Components', 'Priorität', 'Tage bis Austritt', 'WU-Status']
-        
-        # Color code the Tage bis Austritt column
-        def color_days(val):
-            if val < 90:
-                color = '#00bcd4'
-            elif val < 180:
-                color = '#4dd0e1'
-            else:
-                color = '#52c41a'
-            return f'color: {color}; font-weight: bold'
-        
-        styled_df = display_df.style.applymap(color_days, subset=['Tage bis Austritt'])
-        st.dataframe(styled_df, use_container_width=True)
-    
-    # ADD NEW MEMBER FORM IN SIDEBAR
-    colors = get_colors()
-    st.sidebar.markdown(f'<h3 style="color: {colors["primary"]};">➕ Teammitglied von Grund auf hinzufügen</h3>', unsafe_allow_html=True)
-
-    known_component_options = sorted(
-        set(st.session_state.get("component_map", {}).keys()).union(
-            {
-                component.get("component_name", "")
-                for component in st.session_state.get("components_data", [])
-                if component.get("component_name")
-            }
-        )
-    )
-    
-    with st.sidebar.form("add_member", clear_on_submit=True):
-        name = st.text_input("Vollständiger Name")
-        role = st.text_input("Rolle/Position")
-        employee_type = st.selectbox("Mitarbeitertyp", ["Intern", "Lead Cost Employee (LCE)", "Extern"])
-        team = st.selectbox("Team", ["CS1", "CS2", "CS3", "CS4", "CS5", "Unassigned"], index=5)
-        selected_components = st.multiselect("Zugeordnete Komponenten", options=known_component_options)
-        extra_components = st.text_input("Weitere Komponenten (kommagetrennt)")
-        dob = st.date_input("Geburtsdatum", value=datetime(1990, 1, 1))
-
-        col_fin1, col_fin2 = st.columns(2)
-        with col_fin1:
-            weekly_hours_default = int(st.session_state.budget_data.get(employee_type, {}).get("weekly_hours", 35) or 35)
-            weekly_hours = st.number_input("Kontakt-/Wochenstunden", min_value=0, max_value=80, value=weekly_hours_default, step=1)
-        with col_fin2:
-            hourly_rate_default = float(st.session_state.budget_data.get(employee_type, {}).get("hourly_rate", 0) or 0)
-            hourly_rate = st.number_input("Stundensatz (€/h)", min_value=0.0, value=hourly_rate_default, step=0.5)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            start_date = st.date_input("Startdatum", value=datetime.now())
-        with col2:
-            planned_exit = st.date_input("Planned Exit", value=datetime.now() + timedelta(days=365))
-        
-        col3, col4 = st.columns(2)
-        with col3:
-            calculated_kt_status = calculate_kt_status_from_tenure(start_date.strftime("%Y-%m-%d"))
-            kt_mapping = get_kt_status_mapping()
-            kt_options = ["Nicht gestartet", "In Bearbeitung", "Abgeschlossen"]
-            kt_status_display = kt_mapping.get(calculated_kt_status, calculated_kt_status)
-            kt_status_display = st.selectbox("Status der Wissensübergabe", kt_options, index=kt_options.index(kt_status_display) if kt_status_display in kt_options else 0, key="add_kt_status")
-            kt_status = kt_mapping.get(kt_status_display, kt_status_display)
-        with col4:
-            calculated_priority = calculate_priority_from_tenure(start_date.strftime("%Y-%m-%d"))
-            priority_options = ["Low", "Medium", "High", "Critical"]
-            priority = st.selectbox("Prioritätsstufe", priority_options, index=priority_options.index(calculated_priority) if calculated_priority in priority_options else 0, key="add_priority")
-        
-        submitted = st.form_submit_button("💾 Teammitglied speichern", use_container_width=True)
-        if submitted:
-            if name and role:
-                all_components = sorted(dict.fromkeys(selected_components + parse_component_names(extra_components)))
-                new_member = {
-                    "name": name,
-                    "role": role,
-                    "employee_type": employee_type,
-                    "components": ", ".join(all_components),
-                    "start_date": start_date.strftime("%Y-%m-%d"),
-                    "planned_exit": planned_exit.strftime("%Y-%m-%d"),
-                    "knowledge_transfer_status": kt_status,
-                    "priority": priority,
-                    "dob": dob.strftime("%Y-%m-%d"),
-                    "team": team,
-                    "manual_override": True
-                }
-                st.session_state.team_data.append(new_member)
-                st.session_state.employee_settings[name] = {
-                    "hourly_rate": float(hourly_rate),
-                    "weekly_hours": int(weekly_hours),
-                }
-                save_team_data(st.session_state.team_data)
-                save_employee_settings(st.session_state.employee_settings)
-                st.rerun()
-            else:
-                st.sidebar.error("Please fill at least Name and Rolle")
-
-    # PRODUCT & COMPONENT MASTER DATA IN SIDEBAR
-    if 'component_map' not in st.session_state:
-        st.session_state.component_map = {}
-    if 'component_products' not in st.session_state:
-        st.session_state.component_products = {}
-    if 'products_data' not in st.session_state:
-        st.session_state.products_data = []
-    if 'components_data' not in st.session_state:
-        st.session_state.components_data = []
-
-    colors = get_colors()
-    st.sidebar.markdown('#### 🧭 Neues Produkt hinzufügen')
-    with st.sidebar.form("add_product_form", clear_on_submit=True):
-        product_name_input = st.text_input("Produktname")
-        current_phase = st.selectbox("Aktuelle Phase", ["Idee", "Planung", "Design", "Umsetzung", "Test", "Rollout", "Betrieb"])
-        product_description = st.text_input("Kurzbeschreibung / Ziel")
-        product_submitted = st.form_submit_button("💾 Produkt speichern", use_container_width=True)
-
-        if product_submitted:
-            product_name_clean = product_name_input.strip()
-            if product_name_clean:
-                linked_components = sorted(
-                    component.get("component_name", "")
-                    for component in st.session_state.components_data
-                    if component.get("product_name") == product_name_clean and component.get("component_name")
-                )
-                product_record = {
-                    "product_name": product_name_clean,
-                    "current_phase": current_phase,
-                    "description": product_description.strip(),
-                    "components": linked_components,
-                }
-                existing_product_index = next(
-                    (
-                        index
-                        for index, existing in enumerate(st.session_state.products_data)
-                        if existing.get("product_name") == product_name_clean
-                    ),
-                    None,
-                )
-                if existing_product_index is not None:
-                    st.session_state.products_data[existing_product_index] = product_record
-                else:
-                    st.session_state.products_data.append(product_record)
-                save_component_state()
-                st.sidebar.success(f"✅ Produkt '{product_name_clean}' gespeichert.")
-            else:
-                st.sidebar.error("Bitte geben Sie einen Produktnamen ein.")
-
-    st.sidebar.markdown('#### 🧪 Neue Komponente hinzufügen')
-    product_options = [item.get("product_name") for item in st.session_state.products_data if item.get("product_name")] or ["CG", "iUZ", "iBS"]
-    with st.sidebar.form("add_component_form", clear_on_submit=True):
-        component_name = st.text_input("Komponentenname")
-        product_name = st.selectbox("Produkt", options=product_options)
-        responsible_persons = st.multiselect("Verantwortliche Person(en)", options=[member['name'] for member in st.session_state.team_data])
-        complexity_score = st.slider("Komplexität (1-10)", min_value=1, max_value=10, value=5)
-        required_count = st.number_input("Benötigte Anzahl Personen (permanent)", min_value=1, max_value=10, value=1)
-        transfer_time = st.number_input("Wissensübergabe Zeit (Monate)", min_value=1, max_value=24, value=6)
-        documentation_status = st.selectbox("Dokumentationsgrad", ["Nicht bewertet", "Niedrig", "Mittel", "Gut"])
-        backup_available = st.checkbox("Backup verfügbar")
-        component_submitted = st.form_submit_button("💾 Komponente speichern", use_container_width=True)
-
-        if component_submitted:
-            component_name_clean = component_name.strip()
-            if component_name_clean and responsible_persons:
-                component_record = {
-                    "component_name": component_name_clean,
-                    "product_name": product_name,
-                    "responsible_persons": responsible_persons,
-                    "complexity_score": int(complexity_score),
-                    "knowledge_transfer_time_needed": int(transfer_time),
-                    "required_resources": int(required_count),
-                    "documentation_status": documentation_status,
-                    "backup_available": bool(backup_available),
-                }
-                existing_component_index = next(
-                    (
-                        index
-                        for index, existing in enumerate(st.session_state.components_data)
-                        if existing.get("component_name") == component_name_clean
-                    ),
-                    None,
-                )
-                if existing_component_index is not None:
-                    st.session_state.components_data[existing_component_index] = component_record
-                else:
-                    st.session_state.components_data.append(component_record)
-
-                matching_product = next(
-                    (item for item in st.session_state.products_data if item.get("product_name") == product_name),
-                    None,
-                )
-                if matching_product is None:
-                    st.session_state.products_data.append(
-                        {
-                            "product_name": product_name,
-                            "current_phase": "Planung",
-                            "description": "",
-                            "components": [component_name_clean],
-                        }
-                    )
-                else:
-                    matching_product["components"] = sorted(
-                        set(parse_component_names(matching_product.get("components", [])) + [component_name_clean])
-                    )
-
-                sync_master_data_to_legacy_state()
-                save_component_state()
-                st.sidebar.success(f"✅ '{component_name_clean}' ({product_name}) wurde {', '.join(responsible_persons)} zugewiesen.")
-            else:
-                st.sidebar.error("Bitte geben Sie einen Namen und wählen Sie eine verantwortliche Person aus.")
-
-    # SIDEBAR ACTIONS
-    st.sidebar.markdown("---")
-    colors = get_colors()
-    st.sidebar.markdown(f'<h3 style="color: {colors["primary"]};">🛠️ Aktionen</h3>', unsafe_allow_html=True) 
-    
-    if st.sidebar.button("📊 Exportieren nach Excel", use_container_width=True):
-        # Create downloadable Excel file
-        if not df.empty:
-            df.to_excel("siemens_capacity_plan.xlsx", index=False)
-            st.sidebar.success("✅ Excel-Datei exportiert als 'siemens_capacity_plan.xlsx'")
-        else:
-            st.sidebar.error("Keine Daten zum Exportieren")
-    
-    if st.sidebar.button("🧪 Neu von Grund auf starten", use_container_width=True):
-        st.session_state.team_data = []
-        st.session_state.project_allocations = []
-        st.session_state.employee_settings = {}
-        st.session_state.component_map = {}
-        st.session_state.component_requirements = {}
-        st.session_state.component_transfer_times = {}
-        st.session_state.component_products = {}
-        st.session_state.products_data = []
-        st.session_state.components_data = []
-        st.session_state.editing_index = None
-        save_team_data([])
-        save_project_allocations([])
-        save_employee_settings({})
-        save_component_state()
-        st.rerun()
-    
-    # SIDEBAR STATS
-    st.sidebar.markdown("---")
     colors = get_colors()
     st.sidebar.markdown(f'<h3 style="color: {colors["primary"]};">📈 Schnellstatistiken</h3>', unsafe_allow_html=True)
-    
+
     if not df.empty:
         st.sidebar.metric("Gesamtes Team", len(df))
-        st.sidebar.metric("Gefährdet", len(df[df['days_until_exit'] < 180]))
-        st.sidebar.metric("Durchschnittliche Austrittstage", f"{int(df['days_until_exit'].mean())}d")
+        st.sidebar.metric("Kritische Exits", len(df[df['days_until_exit'] < 180]))
+        st.sidebar.metric("Komponenten-Risiken", len(comp_df[comp_df['Status'] != 'OK']) if not comp_df.empty else 0)
     else:
         st.sidebar.write("Keine Daten verfügbar")
 
