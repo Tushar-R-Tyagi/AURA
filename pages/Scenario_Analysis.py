@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import json
 
 from database.session_store import ensure_session_state
-from logic.scenario_engine import ScenarioSimulator
+from logic.scenario_engine import AurorAI
 from logic.team_service import build_team_dataframe
 from ui.theme import load_theme, render_sidebar_navigation
 
@@ -33,7 +33,7 @@ if not api_key:
 
 # Try to initialize simulator
 try:
-    simulator = ScenarioSimulator(api_key=api_key)
+    aurora = AurorAI(api_key=api_key)
     api_ready = True
 except ValueError as e:
     api_ready = False
@@ -134,7 +134,7 @@ if api_ready:
                         {}
                     )
 
-                    result = simulator.simulate_hiring_delay(
+                    result = aurora.simulate_hiring_delay(
                         component_name=selected_component,
                         delay_days=delay_days,
                         current_staffing=len([
@@ -304,7 +304,7 @@ if api_ready:
                 st.error("Please assign the employee to at least one component")
             else:
                 with st.spinner("🤔 AI analyzing impact..."):
-                    result = simulator.simulate_employee_addition(
+                    result = aurora.simulate_employee_addition(
                         employee_name=emp_name,
                         employee_role=emp_role,
                         employee_level=emp_level,
@@ -407,7 +407,7 @@ if api_ready:
                         {}
                     )
 
-                    result = simulator.analyze_component_risk(
+                    result = aurora.analyze_component_risk(
                         component_name=selected_component,
                         current_staffing=len([
                             t for t in st.session_state.team_data
@@ -521,7 +521,7 @@ if api_ready:
 
         if st.button("🔮 Get Recommendations", type="primary", use_container_width=True):
             with st.spinner("🤔 AI optimizing hiring sequence..."):
-                result = simulator.recommend_hiring_priority(
+                result = aurora.recommend_hiring_priority(
                     available_budget_euros=available_budget,
                     max_hires=max_hires,
                     components_data=st.session_state.get("components_data", []),
@@ -662,7 +662,7 @@ if api_ready:
                                 "role": replacement_data["role"],
                             }
 
-                        result = simulator.predict_kt_success(
+                        result = aurora.predict_kt_success(
                             component_name=departing_data.get("components", "Unknown"),
                             departing_person=departing_dict,
                             replacement_person=replacement_dict,

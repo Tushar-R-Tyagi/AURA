@@ -369,7 +369,7 @@ We'll consider this successful when:
 
 ### Adding a New Scenario
 
-1. **Add method to `ScenarioSimulator`:**
+1. **Add method to `AurorAI` engine:**
 ```python
 def my_new_scenario(self, param1, param2, ...):
     """Describe what this scenario does."""
@@ -391,7 +391,7 @@ elif scenario_type == "My New Scenario":
 
 ### Improving Prompts
 
-Prompts are in `ScenarioSimulator` methods. To improve:
+Prompts are in `AurorAI` methods. To improve:
 1. Try different wording
 2. Add/remove context
 3. Change output format

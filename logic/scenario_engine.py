@@ -1,6 +1,13 @@
 """
-AI-powered scenario simulation engine for workforce planning.
-Uses Claude to predict impact of management decisions.
+🌟 AURORA - AI-powered scenario simulation engine for workforce planning.
+Uses Claude 3.5 Sonnet to predict impact of management decisions.
+
+AURORA helps workforce managers answer critical what-if questions:
+- What if we delay hiring for this component?
+- What if we add a new team member?
+- Where should we prioritize new hires?
+- What's our knowledge transfer risk?
+- How will our budget be affected?
 """
 
 from __future__ import annotations
@@ -25,9 +32,9 @@ class ScenarioResult(TypedDict):
     confidence_score: float  # 0-100%
 
 
-class ScenarioSimulator:
+class AurorAI:
     """
-    AI-powered scenario simulator using Claude's decision reasoning.
+    AURORA: AI-powered scenario simulator using Claude's decision reasoning.
     
     Analyzes workforce management what-if scenarios to predict:
     - Timeline impacts
