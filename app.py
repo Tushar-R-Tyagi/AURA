@@ -4,6 +4,13 @@ import plotly.express as px
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
 import numpy as np
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+env_path = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 from database.session_store import (
     ensure_session_state,

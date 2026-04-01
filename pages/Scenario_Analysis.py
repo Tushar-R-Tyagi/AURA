@@ -2,11 +2,18 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import json
+import os
+from pathlib import Path
+from dotenv import load_dotenv
 
 from database.session_store import ensure_session_state
 from logic.scenario_engine import AurorAI
 from logic.team_service import build_team_dataframe
 from ui.theme import load_theme, render_sidebar_navigation
+
+# Load environment variables from .env file
+env_path = Path(__file__).parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 
 st.set_page_config(
