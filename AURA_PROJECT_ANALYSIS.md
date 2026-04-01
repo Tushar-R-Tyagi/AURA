@@ -1,6 +1,6 @@
-# 🤖 AURORA: Complete Project Analysis & Architecture Document
+# 🤖 AURA: Complete Project Analysis & Architecture Document
 
-**Project Name:** Ressourcenplanner with AURORA AI Engine  
+**Project Name:** AURA (Ressourcenplanner) with AURORA AI Engine  
 **Status:** Prototype/MVP for Business Approval  
 **Technology Stack:** Python, Streamlit, SQLite, Groq LLM, Plotly  
 **Date:** April 1, 2026  
@@ -24,9 +24,9 @@
 
 ## PROJECT OVERVIEW
 
-### What is AURORA?
+### What is AURA?
 
-**AURORA** (AI-powered decision engine) is a real-time workforce scenario simulator that answers strategic "what-if" questions using advanced AI reasoning. It's integrated into a comprehensive resource planning dashboard.
+**AURA** is a comprehensive workforce resource planning dashboard. **AURORA** is its AI-powered decision engine that answers strategic "what-if" questions using advanced AI reasoning.
 
 ### Core Problem Solved
 
@@ -35,13 +35,13 @@
 
 ### Key Innovation
 
-AURORA combines:
+The AURORA engine (within AURA) combines:
 1. **Real-time LLM reasoning** on company-specific workforce data
 2. **Multi-dimensional impact analysis** (Timeline + Budget + Risk)
 3. **Structured, validated outputs** with confidence scoring
 4. **Domain-specific prompting** for workforce decisions
 
-### Business Value
+### Business Value of AURORA Engine
 
 - **Speed:** 5-30 second recommendations vs. 2-week manual analysis
 - **Accuracy:** AI considers 20+ variables humans might miss
@@ -130,9 +130,9 @@ AURORA combines:
 
 **Location:** `app.py` + `pages/`
 
-#### Main Pages
+#### Main Pages (AURA Dashboard)
 
-1. **Executive Dashboard** (`app.py`)
+1. **Executive Dashboard** (`app.py`) - Main AURA page
    - Strategic overview of workforce
    - KPIs: team size, tenure, knowledge transfer status
    - Timeline visualization
@@ -158,9 +158,9 @@ AURORA combines:
    - Monthly budget trends
    - Year-to-date spending
 
-5. **🤖 AURORA Scenarios** (`pages/Scenario_Analysis.py`)
+5. **🤖 AURORA Scenarios** (`pages/Scenario_Analysis.py`) - AURORA AI Engine
    - Interactive scenario selector
-   - 5 scenario types
+   - 5 AURORA scenario types
    - Real-time AURORA analysis
    - Visualizations with Plotly
    - Recommendation display
@@ -176,9 +176,9 @@ AURORA combines:
 
 ---
 
-### 2. AURORA ENGINE (Logic Layer)
+### 2. AURORA ENGINE (AURA's AI Logic Layer)
 
-**Location:** `logic/scenario_engine.py`
+**Location:** `logic/scenario_engine.py` (AURORA's core brain)
 
 #### Architecture
 

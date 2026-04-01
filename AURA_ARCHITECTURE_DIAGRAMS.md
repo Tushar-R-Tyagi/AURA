@@ -1,4 +1,4 @@
-# 🏗️ AURORA: Architecture Diagrams & Visual Analysis
+# 🏗️ AURA: Architecture Diagrams (AURORA Engine) & Visual Analysis
 
 This document contains detailed architecture diagrams for the AURORA system.
 
@@ -13,7 +13,7 @@ This document contains detailed architecture diagrams for the AURORA system.
 │                                                                      │
 │  ┌──────────────┬──────────────┬─────────┬────────┬──────────────┐ │
 │  │   Executive  │   Stammdaten │ Project │Budget  │ 🤖 AURORA   │ │
-│  │  Dashboard   │  Management  │ Alloc.  │ Mgmt   │  Scenarios  │ │
+│  │  Dashboard   │  Management  │ Alloc.  │ Mgmt   │  AI Engine  │ │
 │  │              │              │         │        │             │ │
 │  │ • Team stats │ • Add/edit   │• Timeline│• Cost  │• Hiring     │ │
 │  │ • KPIs       │ • Components │• Capacity│ charts │  delay      │ │
@@ -82,7 +82,7 @@ This document contains detailed architecture diagrams for the AURORA system.
 
 ---
 
-## 2. AURORA ENGINE WORKFLOW
+## 2. AURORA ENGINE WORKFLOW (AURA's AI Brain)
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -91,7 +91,7 @@ This document contains detailed architecture diagrams for the AURORA system.
 └──────────────────┬───────────────────────────────────────────┘
                    │
     ┌──────────────▼────────────────┐
-    │ AURORA ENGINE INITIALIZATION  │
+    │ AURORA ENGINE INIT (AURA Board)│
     │                               │
     │ • Load company context        │
     │ • Initialize Groq client      │
@@ -177,11 +177,11 @@ This document contains detailed architecture diagrams for the AURORA system.
 
 ---
 
-## 3. DATA FLOW DIAGRAM
+## 3. DATA FLOW DIAGRAM (AURA System)
 
 ```
                     ┌──────────────────┐
-                    │   Streamlit UI   │
+                    │   AURA UI        │
                     │   (5 Pages)      │
                     └────────┬─────────┘
                              │
@@ -230,7 +230,7 @@ This document contains detailed architecture diagrams for the AURORA system.
 
 ---
 
-## 4. SCENARIO FLOWCHART (Example: Hiring Delay)
+## 4. SCENARIO FLOWCHART (AURORA Analysis Example: Hiring Delay)
 
 ```
 START (User selects "Hiring Delay" scenario)
