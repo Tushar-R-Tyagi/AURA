@@ -30,8 +30,51 @@ ensure_session_state()
 load_theme()
 render_sidebar_navigation()
 
-PROJECTS = DEFAULT_PROJECTS
-PROJECT_COLORS = DEFAULT_PROJECT_COLORS
+# ===== DYNAMIC PRODUCT & COLOR ASSIGNMENT =====
+def generate_color_palette():
+    """Generate a color palette for all products (defaults + new ones dynamically)."""
+    # Get all products from products_data
+    products_data = st.session_state.get("products_data", [])
+    product_names = [p.get("product_name") for p in products_data if p.get("product_name")]
+    
+    # Start with default colors
+    color_map = dict(DEFAULT_PROJECT_COLORS)
+    
+    # Define a palette of nice distinct colors for new products
+    color_palette = [
+        "#9C27B0",  # Purple
+        "#FF6F00",  # Orange
+        "#E91E63",  # Pink
+        "#00BCD4",  # Cyan
+        "#4CAF50",  # Green
+        "#2196F3",  # Blue
+        "#F44336",  # Red
+        "#3F51B5",  # Indigo
+        "#795548",  # Brown
+        "#009688",  # Teal
+        "#607D8B",  # Blue Grey
+        "#37474F",  # Dark Blue Grey
+    ]
+    
+    # Assign colors to any new products
+    used_colors = set(color_map.values())
+    color_idx = 0
+    
+    for product_name in product_names:
+        if product_name not in color_map:
+            # Find unused color
+            while color_palette[color_idx % len(color_palette)] in used_colors:
+                color_idx += 1
+            
+            color_map[product_name] = color_palette[color_idx % len(color_palette)]
+            used_colors.add(color_map[product_name])
+            color_idx += 1
+    
+    return color_map, product_names
+
+
+# Get dynamic projects and colors
+PROJECT_COLORS, PROJECTS = generate_color_palette()
 
 st.title("📅 Projekt-Allocation Management")
 st.markdown("Verfolgung der Mitarbeiter-Allokation auf Projekte über Zeit")
@@ -47,7 +90,7 @@ with st.sidebar.form("add_allocation"):
     employee_options = df_team['name'].tolist()
     selected_employee = st.selectbox("Mitarbeiter", employee_options)
 
-    # Project selection
+    # Project selection - now includes all products from database
     selected_project = st.selectbox("Projekt", PROJECTS)
 
     # Month range selection
@@ -309,7 +352,9 @@ if st.session_state.project_allocations:
                     # Summary statistics for filtered period
                     st.markdown("#### 📈 Zusammenfassung für ausgewählten Zeitraum")
 
-                    col1, col2, col3 = st.columns(3)
+                    # Create dynamic columns based on number of projects
+                    num_projects = len(PROJECTS)
+                    cols = st.columns(min(num_projects, 4))  # Max 4 columns per row
 
                     for i, project in enumerate(PROJECTS):
                         project_allocs = df_gantt[df_gantt['Resource'] == project]
@@ -327,7 +372,8 @@ if st.session_state.project_allocations:
                                 months_diff = (actual_end.year - actual_start.year) * 12 + (actual_end.month - actual_start.month) + 1
                                 total_fte_months += row['FTE'] * months_diff
 
-                        with [col1, col2, col3][i]:
+                        col_index = i % min(num_projects, 4)
+                        with cols[col_index]:
                             st.metric(f"{project} FTE-Monate", f"{total_fte_months:.1f}")
                 else:
                     st.info("Keine Allokationen im ausgewählten Zeitraum gefunden.")

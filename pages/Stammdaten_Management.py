@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
+from io import BytesIO
+import json
 
 from database.session_store import (
     ensure_session_state,
@@ -9,6 +11,7 @@ from database.session_store import (
     save_project_allocations,
     save_team_data,
 )
+from database.defaults import DEFAULT_PROJECTS
 from logic.team_service import (
     build_team_dataframe,
     calculate_kt_status_from_tenure,
@@ -37,6 +40,246 @@ def parse_component_names(value):
     else:
         raw_items = str(value or "").split(",")
     return [str(item).strip() for item in raw_items if str(item).strip()]
+
+
+# ============= BULK IMPORT HELPER FUNCTIONS =============
+
+def create_employee_template():
+    """Create a sample Excel template for employee bulk import."""
+    template_data = {
+        'name': ['Max Mustermann', 'Anna Schmidt'],
+        'role': ['Senior Developer', 'Product Manager'],
+        'employee_type': ['Intern', 'Lead Cost Employee (LCE)'],
+        'team': ['CS1', 'CS2'],
+        'components': ['Component A, Component B', 'Component C'],
+        'weekly_hours': [35, 40],
+        'hourly_rate': [75.50, 85.00],
+        'start_date': ['2024-01-15', '2023-06-01'],
+        'planned_exit': ['2026-12-31', '2025-12-31'],
+        'dob': ['1990-05-20', '1988-11-10'],
+    }
+    return pd.DataFrame(template_data)
+
+
+def create_product_template():
+    """Create a sample Excel template for product bulk import."""
+    template_data = {
+        'product_name': ['Product A', 'Product B'],
+        'current_phase': ['Umsetzung', 'Planung'],
+        'description': ['Description of Product A', 'Description of Product B'],
+    }
+    return pd.DataFrame(template_data)
+
+
+def create_component_template():
+    """Create a sample Excel template for component bulk import."""
+    template_data = {
+        'component_name': ['Component A', 'Component B'],
+        'product_name': ['Product A', 'Product A'],
+        'responsible_persons': ['Max Mustermann; Anna Schmidt', 'Max Mustermann'],
+        'complexity_score': [7, 5],
+        'required_resources': [2, 1],
+        'knowledge_transfer_time_needed': [6, 3],
+        'documentation_status': ['Gut', 'Mittel'],
+        'backup_available': [True, False],
+    }
+    return pd.DataFrame(template_data)
+
+
+def validate_employee_data(df):
+    """Validate employee data before importing."""
+    errors = []
+    required_cols = ['name', 'role', 'employee_type']
+    
+    for col in required_cols:
+        if col not in df.columns:
+            errors.append(f"❌ Pflicht-Spalte fehlt: '{col}'")
+    
+    if not errors:
+        for idx, row in df.iterrows():
+            if pd.isna(row['name']) or str(row['name']).strip() == '':
+                errors.append(f"❌ Zeile {idx+1}: Name ist erforderlich")
+            if pd.isna(row['role']) or str(row['role']).strip() == '':
+                errors.append(f"❌ Zeile {idx+1}: Role ist erforderlich")
+            if row['employee_type'] not in ['Intern', 'Lead Cost Employee (LCE)', 'Extern']:
+                errors.append(f"❌ Zeile {idx+1}: Ungültiger Mitarbeitertyp (erlaubt: Intern, Lead Cost Employee (LCE), Extern)")
+    
+    return errors
+
+
+def validate_product_data(df):
+    """Validate product data before importing."""
+    errors = []
+    required_cols = ['product_name', 'current_phase']
+    
+    for col in required_cols:
+        if col not in df.columns:
+            errors.append(f"❌ Pflicht-Spalte fehlt: '{col}'")
+    
+    if not errors:
+        valid_phases = ["Idee", "Planung", "Design", "Umsetzung", "Test", "Rollout", "Betrieb"]
+        for idx, row in df.iterrows():
+            if pd.isna(row['product_name']) or str(row['product_name']).strip() == '':
+                errors.append(f"❌ Zeile {idx+1}: Produktname ist erforderlich")
+            if row['current_phase'] not in valid_phases:
+                errors.append(f"❌ Zeile {idx+1}: Ungültige Phase (erlaubt: {', '.join(valid_phases)})")
+    
+    return errors
+
+
+def validate_component_data(df, available_products, available_employees):
+    """Validate component data before importing."""
+    errors = []
+    required_cols = ['component_name', 'product_name', 'responsible_persons']
+    
+    for col in required_cols:
+        if col not in df.columns:
+            errors.append(f"❌ Pflicht-Spalte fehlt: '{col}'")
+    
+    if not errors:
+        for idx, row in df.iterrows():
+            if pd.isna(row['component_name']) or str(row['component_name']).strip() == '':
+                errors.append(f"❌ Zeile {idx+1}: Komponentenname ist erforderlich")
+            if pd.isna(row['product_name']) or str(row['product_name']).strip() == '':
+                errors.append(f"❌ Zeile {idx+1}: Produktname ist erforderlich")
+            elif str(row['product_name']).strip() not in available_products:
+                errors.append(f"❌ Zeile {idx+1}: Produkt '{row['product_name']}' existiert nicht")
+            if pd.isna(row['responsible_persons']) or str(row['responsible_persons']).strip() == '':
+                errors.append(f"❌ Zeile {idx+1}: Verantwortliche Person(en) erforderlich (durch Semikolon trennen)")
+    
+    return errors
+
+
+def import_employees_from_df(df):
+    """Import employees from DataFrame."""
+    imported_count = 0
+    skipped_count = 0
+    skipped_names = []
+    
+    for idx, row in df.iterrows():
+        name = str(row.get('name', '')).strip()
+        
+        # Check if employee already exists
+        existing = next((emp for emp in st.session_state.team_data if emp['name'] == name), None)
+        if existing:
+            skipped_count += 1
+            skipped_names.append(name)
+            continue
+        
+        # Parse components
+        components_str = str(row.get('components', '')).strip()
+        all_components = parse_component_names(components_str)
+        
+        # Get defaults for missing values
+        employee_type = str(row.get('employee_type', 'Intern')).strip()
+        weekly_hours = int(row.get('weekly_hours', 35)) if pd.notna(row.get('weekly_hours')) else 35
+        hourly_rate = float(row.get('hourly_rate', 0)) if pd.notna(row.get('hourly_rate')) else 0.0
+        start_date = row.get('start_date', datetime.now().strftime('%Y-%m-%d'))
+        planned_exit = row.get('planned_exit', (datetime.now() + timedelta(days=365)).strftime('%Y-%m-%d'))
+        dob = row.get('dob', '1990-01-01')
+        team = str(row.get('team', 'Unassigned')).strip()
+        
+        # Create employee record
+        new_member = {
+            'name': name,
+            'role': str(row.get('role', '')).strip(),
+            'employee_type': employee_type,
+            'components': ', '.join(all_components),
+            'start_date': str(start_date).strip(),
+            'planned_exit': str(planned_exit).strip(),
+            'knowledge_transfer_status': 'Nicht gestartet',
+            'priority': calculate_priority_from_tenure(str(start_date).strip()),
+            'dob': str(dob).strip(),
+            'team': team,
+            'manual_override': True,
+        }
+        
+        st.session_state.team_data.append(new_member)
+        st.session_state.employee_settings[name] = {
+            'hourly_rate': float(hourly_rate),
+            'weekly_hours': int(weekly_hours),
+        }
+        imported_count += 1
+    
+    return imported_count, skipped_count, skipped_names
+
+
+def import_products_from_df(df):
+    """Import products from DataFrame."""
+    imported_count = 0
+    updated_count = 0
+    
+    for idx, row in df.iterrows():
+        product_name = str(row.get('product_name', '')).strip()
+        
+        if not product_name:
+            continue
+        
+        product_record = {
+            'product_name': product_name,
+            'current_phase': str(row.get('current_phase', 'Planung')).strip(),
+            'description': str(row.get('description', '')).strip(),
+            'components': [],
+        }
+        
+        # Check if product exists
+        existing_idx = next(
+            (i for i, p in enumerate(st.session_state.products_data) if p.get('product_name') == product_name),
+            None
+        )
+        
+        if existing_idx is not None:
+            st.session_state.products_data[existing_idx] = product_record
+            updated_count += 1
+        else:
+            st.session_state.products_data.append(product_record)
+            imported_count += 1
+    
+    return imported_count, updated_count
+
+
+def import_components_from_df(df):
+    """Import components from DataFrame."""
+    imported_count = 0
+    updated_count = 0
+    errors = []
+    
+    for idx, row in df.iterrows():
+        component_name = str(row.get('component_name', '')).strip()
+        
+        if not component_name:
+            continue
+        
+        # Parse responsible persons (semicolon-separated)
+        responsible_str = str(row.get('responsible_persons', '')).strip()
+        responsible_list = [p.strip() for p in responsible_str.split(';') if p.strip()]
+        
+        component_record = {
+            'component_name': component_name,
+            'product_name': str(row.get('product_name', '')).strip(),
+            'responsible_persons': responsible_list,
+            'complexity_score': int(row.get('complexity_score', 5)) if pd.notna(row.get('complexity_score')) else 5,
+            'knowledge_transfer_time_needed': int(row.get('knowledge_transfer_time_needed', 6)) if pd.notna(row.get('knowledge_transfer_time_needed')) else 6,
+            'required_resources': int(row.get('required_resources', 1)) if pd.notna(row.get('required_resources')) else 1,
+            'documentation_status': str(row.get('documentation_status', 'Nicht bewertet')).strip(),
+            'backup_available': bool(row.get('backup_available', False)) if pd.notna(row.get('backup_available')) else False,
+        }
+        
+        # Check if component exists
+        existing_idx = next(
+            (i for i, c in enumerate(st.session_state.components_data) if c.get('component_name') == component_name),
+            None
+        )
+        
+        if existing_idx is not None:
+            st.session_state.components_data[existing_idx] = component_record
+            updated_count += 1
+        else:
+            st.session_state.components_data.append(component_record)
+            imported_count += 1
+    
+    return imported_count, updated_count
+
 
 
 def sync_master_data_to_legacy_state():
@@ -82,6 +325,20 @@ def sync_master_data_to_legacy_state():
 sync_master_data_to_legacy_state()
 df = build_team_dataframe(st.session_state.team_data)
 
+# Ensure DEFAULT_PROJECTS (CG, iUZ, IBS) are always in products_data
+existing_product_names = {p.get("product_name") for p in st.session_state.products_data}
+for default_product in DEFAULT_PROJECTS:
+    if default_product not in existing_product_names:
+        st.session_state.products_data.append({
+            "product_name": default_product,
+            "current_phase": "Betrieb" if default_product in ["CG", "iUZ"] else "Planung",
+            "description": f"Standardprodukt: {default_product}",
+            "components": [],
+        })
+        save_component_state()
+
+
+
 st.title("🛠️ Stammdaten & Teamverwaltung")
 st.markdown("Alle Eingaben, Bearbeitungen und administrativen Aktionen sind jetzt hier gebündelt – getrennt vom Executive Dashboard.")
 
@@ -93,6 +350,66 @@ team_tab, master_tab, admin_tab = st.tabs([
 
 with team_tab:
     st.markdown("### 👥 Teamdaten pflegen")
+    
+    # Bulk import section
+    st.markdown("#### 📥 Großmengen-Import für Mitarbeiter")
+    import_col1, import_col2 = st.columns(2)
+    
+    with import_col1:
+        st.markdown("**Schritt 1:** Vorlage herunterladen")
+        employee_template = create_employee_template()
+        csv_buffer = BytesIO()
+        employee_template.to_csv(csv_buffer, index=False)
+        csv_buffer.seek(0)
+        
+        st.download_button(
+            label="📄 Mitarbeiter-Vorlage (CSV)",
+            data=csv_buffer.getvalue(),
+            file_name="mitarbeiter_vorlage.csv",
+            mime="text/csv",
+        )
+    
+    with import_col2:
+        st.markdown("**Schritt 2:** Datei hochladen")
+        uploaded_employees = st.file_uploader(
+            "CSV oder Excel-Datei mit Mitarbeitern",
+            type=["csv", "xlsx"],
+            key="employee_uploader",
+            help="Verwenden Sie die heruntergeladene Vorlage"
+        )
+    
+    if uploaded_employees is not None:
+        try:
+            if uploaded_employees.name.endswith('.csv'):
+                employee_df = pd.read_csv(uploaded_employees)
+            else:
+                employee_df = pd.read_excel(uploaded_employees)
+            
+            # Validate data
+            validation_errors = validate_employee_data(employee_df)
+            
+            if validation_errors:
+                st.error("⚠️ Daten-Validierungsfehler:")
+                for error in validation_errors:
+                    st.write(error)
+            else:
+                st.success(f"✅ {len(employee_df)} Mitarbeiter gefunden - Vorschau:")
+                st.dataframe(employee_df.head(10), use_container_width=True)
+                
+                if st.button("💾 Mitarbeiter importieren", key="import_employees_btn"):
+                    imported, skipped, skipped_names = import_employees_from_df(employee_df)
+                    save_team_data(st.session_state.team_data)
+                    save_employee_settings(st.session_state.employee_settings)
+                    
+                    st.success(f"✅ {imported} Mitarbeiter importiert")
+                    if skipped > 0:
+                        st.warning(f"⏭️ {skipped} Mitarbeiter übersprungen (existieren bereits): {', '.join(skipped_names)}")
+                    st.rerun()
+        except Exception as e:
+            st.error(f"❌ Fehler beim Lesen der Datei: {str(e)}")
+    
+    st.markdown("---")
+    
     form_col, summary_col = st.columns([1.1, 0.9])
 
     with form_col:
@@ -327,6 +644,108 @@ with master_tab:
         st.session_state.products_data = []
     if "components_data" not in st.session_state:
         st.session_state.components_data = []
+
+    # ===== BULK IMPORT SECTIONS =====
+    st.markdown("#### 📥 Großmengen-Import")
+    bulk_col1, bulk_col2 = st.columns(2)
+    
+    with bulk_col1:
+        st.markdown("**Produkte importieren**")
+        product_template = create_product_template()
+        product_csv = BytesIO()
+        product_template.to_csv(product_csv, index=False)
+        product_csv.seek(0)
+        
+        st.download_button(
+            label="📄 Produkt-Vorlage (CSV)",
+            data=product_csv.getvalue(),
+            file_name="produkte_vorlage.csv",
+            mime="text/csv",
+            key="product_template_btn"
+        )
+        
+        uploaded_products = st.file_uploader(
+            "CSV oder Excel mit Produkten",
+            type=["csv", "xlsx"],
+            key="product_uploader",
+            help="Produktname, aktuelle Phase, Beschreibung"
+        )
+        
+        if uploaded_products is not None:
+            try:
+                if uploaded_products.name.endswith('.csv'):
+                    product_df = pd.read_csv(uploaded_products)
+                else:
+                    product_df = pd.read_excel(uploaded_products)
+                
+                validation_errors = validate_product_data(product_df)
+                if validation_errors:
+                    st.error("⚠️ Validierungsfehler:")
+                    for error in validation_errors:
+                        st.write(error)
+                else:
+                    st.success(f"✅ {len(product_df)} Produkte - Vorschau:")
+                    st.dataframe(product_df.head(10), use_container_width=True)
+                    
+                    if st.button("💾 Produkte importieren", key="import_products_btn"):
+                        imported, updated = import_products_from_df(product_df)
+                        save_component_state()
+                        st.success(f"✅ {imported} neue Produkte, {updated} aktualisiert")
+                        st.rerun()
+            except Exception as e:
+                st.error(f"❌ Fehler: {str(e)}")
+    
+    with bulk_col2:
+        st.markdown("**Komponenten importieren**")
+        component_template = create_component_template()
+        component_csv = BytesIO()
+        component_template.to_csv(component_csv, index=False)
+        component_csv.seek(0)
+        
+        st.download_button(
+            label="📄 Komponenten-Vorlage (CSV)",
+            data=component_csv.getvalue(),
+            file_name="komponenten_vorlage.csv",
+            mime="text/csv",
+            key="component_template_btn"
+        )
+        
+        uploaded_components = st.file_uploader(
+            "CSV oder Excel mit Komponenten",
+            type=["csv", "xlsx"],
+            key="component_uploader",
+            help="Name, Produkt, Verantwortliche (durch ; trennen)"
+        )
+        
+        if uploaded_components is not None:
+            try:
+                if uploaded_components.name.endswith('.csv'):
+                    component_df = pd.read_excel(uploaded_components)
+                else:
+                    component_df = pd.read_excel(uploaded_components)
+                
+                available_products = [p.get('product_name') for p in st.session_state.products_data]
+                available_employees = [e['name'] for e in st.session_state.team_data]
+                
+                validation_errors = validate_component_data(component_df, available_products, available_employees)
+                if validation_errors:
+                    st.error("⚠️ Validierungsfehler:")
+                    for error in validation_errors:
+                        st.write(error)
+                else:
+                    st.success(f"✅ {len(component_df)} Komponenten - Vorschau:")
+                    st.dataframe(component_df.head(10), use_container_width=True)
+                    
+                    if st.button("💾 Komponenten importieren", key="import_components_btn"):
+                        imported, updated = import_components_from_df(component_df)
+                        sync_master_data_to_legacy_state()
+                        save_component_state()
+                        st.success(f"✅ {imported} neue Komponenten, {updated} aktualisiert")
+                        st.rerun()
+            except Exception as e:
+                st.error(f"❌ Fehler: {str(e)}")
+    
+    st.markdown("---")
 
     product_col, component_col = st.columns(2)
 
