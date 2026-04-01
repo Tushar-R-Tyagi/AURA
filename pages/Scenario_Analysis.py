@@ -10,7 +10,7 @@ from ui.theme import load_theme, render_sidebar_navigation
 
 
 st.set_page_config(
-    page_title="🤖 Scenario Analysis",
+    page_title="🤖 AURORA",
     page_icon="🤖",
     layout="wide"
 )
@@ -19,7 +19,7 @@ ensure_session_state()
 load_theme()
 render_sidebar_navigation()
 
-st.title("🤖 AURA AI - Scenario Simulator")
+st.title("🤖 AURORA - Scenario Simulator")
 st.markdown("Use AI to predict impact of your workforce decisions")
 st.markdown("---")
 

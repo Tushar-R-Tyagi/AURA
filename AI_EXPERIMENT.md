@@ -1,4 +1,4 @@
-# 🤖 AURA AI Prototype - Scenario Simulation Experiment
+# 🤖 AURORA - Scenario Simulation Experiment
 
 **Branch:** `aura-ai-prototype`  
 **Status:** 🧪 Experimental - In Active Development  
