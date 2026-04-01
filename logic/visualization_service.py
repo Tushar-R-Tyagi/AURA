@@ -52,11 +52,10 @@ def create_budget_impact_chart(budget_impact: float, component_name: str) -> go.
         impact_label = f"€{budget_impact:,.0f} (savings)"
     
     fig = go.Figure(go.Indicator(
-        mode="gauge+number+delta",
+        mode="gauge+number",
         value=abs(budget_impact),
         title={"text": f"💰 Budget Impact ({component_name})"},
         domain={"x": [0, 1], "y": [0, 1]},
-        delta={"reference": 0, "suffix": "€"},
         gauge={
             "axis": {"range": [None, abs(budget_impact) * 1.2]},
             "bar": {"color": delta_color},
@@ -69,8 +68,18 @@ def create_budget_impact_chart(budget_impact: float, component_name: str) -> go.
                 "thickness": 0.75,
                 "value": abs(budget_impact) * 0.9
             }
-        }
+        },
     ))
+    
+    fig.add_annotation(
+        text=impact_label,
+        xref="paper",
+        yref="paper",
+        x=0.5,
+        y=0.3,
+        showarrow=False,
+        font=dict(size=12, color=delta_color)
+    )
     
     fig.update_layout(height=350)
     return fig
@@ -94,11 +103,10 @@ def create_risk_gauge_chart(risk_increase: float, component_name: str) -> go.Fig
         risk_level = "CRITICAL"
     
     fig = go.Figure(go.Indicator(
-        mode="gauge+number+delta",
+        mode="gauge+number",
         value=risk_increase,
         title={"text": f"⚠️ Risk Increase ({component_name})"},
         domain={"x": [0, 1], "y": [0, 1]},
-        suffix="%",
         gauge={
             "axis": {"range": [0, 100]},
             "bar": {"color": color},
@@ -114,8 +122,18 @@ def create_risk_gauge_chart(risk_increase: float, component_name: str) -> go.Fig
                 "value": 90
             }
         },
-        number={"suffix": f"% → {risk_level}"}
+        number={"valueformat": ".0f"},
     ))
+    
+    fig.add_annotation(
+        text=f"{risk_level}",
+        xref="paper",
+        yref="paper",
+        x=0.5,
+        y=0.3,
+        showarrow=False,
+        font=dict(size=16, color=color)
+    )
     
     fig.update_layout(height=350)
     return fig
@@ -139,7 +157,6 @@ def create_confidence_gauge_chart(confidence_score: float) -> go.Figure:
         value=confidence_score,
         title={"text": "🤖 AI Confidence"},
         domain={"x": [0, 1], "y": [0, 1]},
-        suffix="%",
         gauge={
             "axis": {"range": [0, 100]},
             "bar": {"color": color},
@@ -149,8 +166,17 @@ def create_confidence_gauge_chart(confidence_score: float) -> go.Figure:
                 {"range": [70, 100], "color": "#E0FFE0"}
             ]
         },
-        number={"suffix": f"% ({level})"}
     ))
+    
+    fig.add_annotation(
+        text=f"({level})",
+        xref="paper",
+        yref="paper",
+        x=0.5,
+        y=0.3,
+        showarrow=False,
+        font=dict(size=14, color=color)
+    )
     
     fig.update_layout(height=300)
     return fig
