@@ -448,16 +448,15 @@ COMPANY CONTEXT:
 
 USER QUESTION: {question}
 
-Provide a comprehensive analysis in JSON format:
+Provide a comprehensive analysis in valid JSON format (IMPORTANT: ensure all strings are properly escaped):
 
 {{
   "answer": "<direct, concise answer to the question>",
   "key_factors_considered": [
     "<factor 1>",
-    "<factor 2>",
-    ...
+    "<factor 2>"
   ],
-  "analysis": "<2-3 paragraph detailed reasoning>",
+  "analysis": "<2-3 sentences explaining your reasoning. If multiple paragraphs needed, use explicit paragraph breaks with [BREAK]>",
   "recommendations": [
     {{
       "action": "<recommended action>",
@@ -465,8 +464,7 @@ Provide a comprehensive analysis in JSON format:
       "expected_impact": "<what will happen>",
       "risk": "<what could go wrong>",
       "timeline": "<how long will it take>"
-    }},
-    ...
+    }}
   ],
   "alternative_perspectives": [
     {{
@@ -474,12 +472,17 @@ Provide a comprehensive analysis in JSON format:
       "why_relevant": "<why consider this>",
       "pros": "<advantages>",
       "cons": "<disadvantages>"
-    }},
-    ...
+    }}
   ],
   "confidence_score": <0-100>,
   "confidence_explanation": "<why this confidence level>"
 }}
+
+IMPORTANT JSON RULES:
+- All quotes inside strings must be escaped with backslash
+- No actual newlines in string values - use [BREAK] for paragraph breaks instead
+- All special characters must be properly escaped
+- Output ONLY valid JSON, no markdown code fences
 
 Be specific with numbers and timelines. Consider industry best practices and realistic constraints.
 """
@@ -503,23 +506,27 @@ Provide structured JSON comparing alternatives:
     {{
       "option_name": "<name of option>",
       "description": "<what is this option>",
-      "pros": ["<pro 1>", "<pro 2>", ...],
-      "cons": ["<con 1>", "<con 2>", ...],
+      "pros": ["<pro 1>", "<pro 2>"],
+      "cons": ["<con 1>", "<con 2>"],
       "timeline_impact": "<effect on timelines>",
       "budget_impact": "<cost or savings>",
       "risk_level": "<LOW, MEDIUM, HIGH>",
       "implementation_difficulty": "<EASY, MODERATE, DIFFICULT>"
-    }},
-    ...
+    }}
   ],
   "recommended_option": {{
     "choice": "<which option is best>",
     "rationale": "<why this one>",
-    "conditions": ["<condition 1>", "<condition 2>", ...]
+    "conditions": ["<condition 1>", "<condition 2>"]
   }},
   "hybrid_approach": "<if combining options could work>",
   "confidence_score": <0-100>
 }}
+
+IMPORTANT JSON RULES:
+- All quotes inside strings must be escaped with backslash
+- No actual newlines in string values - use [BREAK] for paragraph breaks instead
+- Output ONLY valid JSON
 
 Be analytical and data-driven in comparisons.
 """
@@ -550,24 +557,23 @@ Provide JSON with sensitivity analysis:
         "outcome": "<best case outcome>",
         "confidence": <0-100>
       }},
-      "base_case": {{
-        "value": "<realistic/expected value>",
-        "outcome": "<baseline outcome>",
-        "confidence": <0-100>
-      }},
       "worst_case": {{
         "value": "<pessimistic value>",
         "outcome": "<worst case outcome>",
         "confidence": <0-100>
       }}
-    }},
-    ...
+    }}
   ],
-  "breakeven_analysis": "<what assumptions would change the recommendation>",
+  "breakeven_analysis": "<what assumptions change the recommendation>",
   "most_sensitive_to": "<which variable matters most>",
-  "recommendations": "<which scenario is most likely and recommended>",
+  "recommendations": "<which scenario is most likely>",
   "confidence_score": <0-100>
 }}
+
+IMPORTANT JSON RULES:
+- Output ONLY valid JSON
+- No actual newlines in strings
+- Confirm all strings are properly escaped
 
 Identify the critical variables that matter most to the decision.
 """
@@ -583,34 +589,40 @@ COMPANY CONTEXT:
 USER HYPOTHESIS/THEORY: {question}
 
 The user has a theory or hypothesis about workforce planning. 
-Validate or challenge it with objective analysis:
+Validate or challenge it with objective analysis. Output valid JSON:
 
 {{
   "hypothesis": "<the user's theory restated>",
   "assessment": "<LIKELY TRUE / UNCERTAIN / PROBABLY FALSE>",
   "supporting_evidence": [
-    "<evidence or reasoning that supports the hypothesis>",
-    ...
+    "<evidence supporting the hypothesis>",
+    "<another supporting evidence>"
   ],
   "contradicting_evidence": [
-    "<evidence or reasoning that contradicts the hypothesis>",
-    ...
+    "<evidence contradicting the hypothesis>",
+    "<another contradicting evidence>"
   ],
   "conditions_for_truth": [
     "<condition that must be met for hypothesis to be true>",
-    ...
+    "<another condition>"
   ],
-  "detailed_analysis": "<3-4 paragraph objective analysis>",
-  "recommendation": "{{
+  "detailed_analysis": "<3-4 sentences of objective analysis>",
+  "recommendation": {{
     "action": "<what to do based on analysis>",
     "rationale": "<why>",
-    "monitoring_metrics": ["<metric to track>", ...]
-  }}",
+    "monitoring_metrics": ["<metric to track>"]
+  }},
   "confidence_score": <0-100>,
-  "needed_validation": ["<what data would confirm this>", ...]
+  "needed_validation": ["<what data would confirm this>"]
 }}
 
-Be balanced and consider both sides. Give honest assessment even if contradicts user's theory.
+IMPORTANT JSON RULES:
+- Output ONLY valid JSON
+- No actual newlines in strings
+- Use [BREAK] for paragraph breaks in longer text
+- All quotes must be escaped
+
+Be balanced and consider both sides. Give honest assessment even if it contradicts the user's theory.
 """
     
     def _build_custom_context(
@@ -674,15 +686,33 @@ Please consider this context when answering the user's question.
                 raise ValueError("No JSON found in response")
             
             json_str = response_text[json_start:json_end]
-            result = json.loads(json_str)
+            
+            # Clean JSON string: replace problematic control characters
+            # but preserve escaped sequences
+            json_str_clean = json_str.replace('\r', '').replace('\t', ' ')
+            
+            # Try to parse with error recovery
+            try:
+                result = json.loads(json_str_clean)
+            except json.JSONDecodeError as je:
+                # If first attempt fails, try removing line breaks within string values
+                # This is a fallback for improperly formatted JSON
+                import re
+                # Replace actual newlines with spaces within quoted strings
+                json_str_fixed = re.sub(r'(?<=["\'])\n(?=["\'])', ' ', json_str_clean)
+                result = json.loads(json_str_fixed)
+            
             result["analysis_type"] = analysis_type
             result["full_response"] = response_text  # Store original for transparency
             
             return result
         
         except Exception as e:
+            import traceback
+            error_msg = f"API Error: {str(e)}"
+            # Log the response for debugging if available
             return {
-                "error": f"API Error: {str(e)}",
+                "error": error_msg,
                 "analysis_type": analysis_type,
                 "confidence_score": 0,
             }
