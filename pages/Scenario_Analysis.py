@@ -141,7 +141,7 @@ if api_ready:
             if selected_component == "No components found":
                 st.error("Please add components first in Stammdaten Management")
             else:
-                with st.spinner("🤔 AI analyzing scenario..."):
+                with st.spinner("🤔 AURORA analyzing scenario..."):
                     # Get component details
                     comp_data = next(
                         (c for c in st.session_state.components_data
@@ -175,7 +175,7 @@ if api_ready:
 
                 # Display reasoning
                 if results.get("reasoning"):
-                    with st.expander("💭 AI Reasoning"):
+                    with st.expander("💭 AURORA Reasoning"):
                         st.write(results["reasoning"])
 
                 # Impact metrics
@@ -213,9 +213,9 @@ if api_ready:
                 with col4:
                     confidence = results.get("confidence_score", 0)
                     st.metric(
-                        "AI Confidence",
+                        "AURORA Confidence",
                         f"{confidence:.0f}%",
-                        help="How confident is the AI in this prediction?"
+                        help="How confident is AURORA in this prediction?"
                     )
 
                 # Prognose visualizations
@@ -251,7 +251,7 @@ if api_ready:
                     st.plotly_chart(conf_chart, use_container_width=True)
 
                 # Recommendation
-                st.markdown("### 🎯 AI Recommendation")
+                st.markdown("### 🎯 AURORA Recommendation")
                 recommendation = results.get("recommendation", "No recommendation")
 
                 if "AVOID" in recommendation:
@@ -354,7 +354,7 @@ if api_ready:
             if not components_assigned or components_assigned[0] == "No components":
                 st.error("Please assign the employee to at least one component")
             else:
-                with st.spinner("🤔 AI analyzing impact..."):
+                with st.spinner("🤔 AURORA analyzing impact..."):
                     result = aurora.simulate_employee_addition(
                         employee_name=emp_name,
                         employee_role=emp_role,
@@ -399,10 +399,10 @@ if api_ready:
 
                 with col4:
                     confidence = results.get("confidence_score", 0)
-                    st.metric("AI Confidence", f"{confidence:.0f}%")
+                    st.metric("AURORA Confidence", f"{confidence:.0f}%")
 
                 # Recommendation
-                st.markdown("### 🎯 AI Recommendation")
+                st.markdown("### 🎯 AURORA Recommendation")
                 recommendation = results.get("recommendation", "No recommendation")
 
                 if "HIRE" in recommendation:
@@ -451,7 +451,7 @@ if api_ready:
             if selected_component == "No components found":
                 st.error("Please add components first")
             else:
-                with st.spinner("🤔 AI analyzing risk..."):
+                with st.spinner("🤔 AURORA analyzing risk..."):
                     comp_data = next(
                         (c for c in st.session_state.components_data
                          if c.get("component_name") == selected_component),
@@ -697,7 +697,7 @@ if api_ready:
                 )
 
                 if st.button("🔮 Analyze KT Success", type="primary", use_container_width=True):
-                    with st.spinner("🤔 AI analyzing KT scenario..."):
+                    with st.spinner("🤔 AURORA analyzing KT scenario..."):
                         departing_dict = {
                             "name": departing_person,
                             "role": departing_data["role"],

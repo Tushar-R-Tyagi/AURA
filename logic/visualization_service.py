@@ -140,7 +140,7 @@ def create_risk_gauge_chart(risk_increase: float, component_name: str) -> go.Fig
 
 
 def create_confidence_gauge_chart(confidence_score: float) -> go.Figure:
-    """Create gauge chart for AI confidence score."""
+    """Create gauge chart for AURORA confidence score."""
     
     if confidence_score >= 80:
         color = "green"
@@ -155,7 +155,7 @@ def create_confidence_gauge_chart(confidence_score: float) -> go.Figure:
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=confidence_score,
-        title={"text": "🤖 AI Confidence"},
+        title={"text": "🤖 AURORA Confidence"},
         domain={"x": [0, 1], "y": [0, 1]},
         gauge={
             "axis": {"range": [0, 100]},
