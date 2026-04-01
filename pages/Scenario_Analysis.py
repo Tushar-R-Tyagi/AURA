@@ -27,7 +27,7 @@ st.markdown("---")
 st.session_state.setdefault("scenario_results", None)
 
 # Check for API key
-api_key = st.session_state.get("anthropic_api_key")
+api_key = st.session_state.get("groq_api_key")
 if not api_key:
     api_key = None  # Will use environment variable
 
@@ -43,22 +43,23 @@ if not api_ready:
     st.error(f"⚠️ AI Service Error: {api_error}")
     st.info(
         """
-        To use scenario simulations, you need to:
-        1. Set environment variable: `ANTHROPIC_API_KEY=sk-...`
+        To use scenario simulations, you need a FREE Groq API key:
+        1. Set environment variable: `GROQ_API_KEY=gsk_...`
         2. Or enter your API key in the sidebar below
         
-        Get your free API key at: https://console.anthropic.com/
+        Get your **FREE** API key at: https://console.groq.com/
+        
         """
     )
     
     with st.expander("💡 Enter API Key Manually"):
         input_key = st.text_input(
-            "Anthropic API Key",
+            "Groq API Key",
             type="password",
             help="Your key will only be used for this session"
         )
         if input_key:
-            st.session_state.anthropic_api_key = input_key
+            st.session_state.groq_api_key = input_key
             st.info("✅ API key set for this session. Refresh the page to use it.")
 
 if api_ready:

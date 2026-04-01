@@ -1,6 +1,6 @@
 """
 🌟 AURORA - AI-powered scenario simulation engine for workforce planning.
-Uses Claude 3.5 Sonnet to predict impact of management decisions.
+Uses Groq's Mixtral/Llama models to predict impact of management decisions.
 
 AURORA helps workforce managers answer critical what-if questions:
 - What if we delay hiring for this component?
@@ -17,7 +17,7 @@ import os
 from datetime import datetime, timedelta
 from typing import TypedDict
 
-import anthropic
+from groq import Groq
 
 
 class ScenarioResult(TypedDict):
@@ -44,15 +44,15 @@ class AurorAI:
     """
     
     def __init__(self, api_key: str = None):
-        """Initialize Claude API client."""
-        self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
+        """Initialize Groq API client."""
+        self.api_key = api_key or os.getenv("GROQ_API_KEY")
         if not self.api_key:
             raise ValueError(
-                "ANTHROPIC_API_KEY not set. "
+                "GROQ_API_KEY not set. "
                 "Set via environment variable or pass to __init__"
             )
-        self.client = anthropic.Anthropic(api_key=self.api_key)
-        self.model = "claude-3-5-sonnet-20241022"
+        self.client = Groq(api_key=self.api_key)
+        self.model = "mixtral-8x7b-32768"  # Fast and powerful Groq model
     
     def simulate_hiring_delay(
         self,
@@ -551,23 +551,23 @@ CRITICALITY INDICATORS:
         return "\n".join(priority_list)
     
     def _call_claude_scenario(self, prompt: str, scenario_type: str) -> dict:
-        """Call Claude API and parse scenario response."""
+        """Call Groq API and parse scenario response."""
         
         try:
-            response = self.client.messages.create(
+            response = self.client.chat.completions.create(
                 model=self.model,
                 max_tokens=2000,
                 messages=[{"role": "user", "content": prompt}],
             )
             
-            response_text = response.content[0].text
+            response_text = response.choices[0].message.content
             
             # Extract JSON from response
             json_start = response_text.find("{")
             json_end = response_text.rfind("}") + 1
             
             if json_start == -1 or json_end <= json_start:
-                raise ValueError("No JSON found in Claude response")
+                raise ValueError("No JSON found in Groq response")
             
             json_str = response_text[json_start:json_end]
             result = json.loads(json_str)
@@ -576,15 +576,9 @@ CRITICALITY INDICATORS:
             
             return result
         
-        except anthropic.APIError as e:
+        except Exception as e:
             return {
                 "error": f"API Error: {str(e)}",
-                "scenario_type": scenario_type,
-                "confidence_score": 0,
-            }
-        except json.JSONDecodeError as e:
-            return {
-                "error": f"Failed to parse AI response: {str(e)}",
                 "scenario_type": scenario_type,
                 "confidence_score": 0,
             }

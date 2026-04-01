@@ -105,14 +105,15 @@ Output:
 ## 🔧 Technical Stack
 
 ### AI Model
-- **Claude 3.5 Sonnet** (Anthropic)
-  - Reasoning-optimized LLM
-  - Best for complex business scenario analysis
-  - Natural language explanations
+- **Groq - Mixtral 8x7B** (Free & Lightning Fast)
+  - State-of-the-art open model
+  - Perfect for business scenario analysis
+  - **100% FREE** - no payment required
+  - Ultra-fast inference (< 1 second)
 
 ### Additional Libraries
 ```python
-anthropic==0.7.6      # Claude API client
+groq==0.9.0           # Groq API client
 streamlit>=1.28.0     # Already included
 pandas>=2.0.0         # Already included
 plotly>=5.0.0         # Already included
@@ -122,20 +123,20 @@ plotly>=5.0.0         # Already included
 
 ## 🚀 How to Use
 
-### Step 1: Get API Key
+### Step 1: Get FREE API Key
 
-1. Visit [console.anthropic.com](https://console.anthropic.com)
-2. Sign up for free (includes $5 free credits)
-3. Copy your API key (starts with `sk-`)
+1. Visit [console.groq.com](https://console.groq.com)
+2. Sign up for free (takes 1 minute)
+3. Copy your API key (starts with `gsk_`)
 
 ### Step 2: Set Environment Variable
 
 ```bash
 # macOS/Linux
-export ANTHROPIC_API_KEY=sk-your-key-here
+export GROQ_API_KEY=gsk-your-key-here
 
 # Windows (PowerShell)
-$env:ANTHROPIC_API_KEY='sk-your-key-here'
+$env:GROQ_API_KEY='gsk-your-key-here'
 
 # Or add to .env file (then load with python-dotenv)
 ```
