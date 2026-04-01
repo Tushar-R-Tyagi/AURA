@@ -439,190 +439,108 @@ Be realistic about what can be transferred in {planned_kt_weeks} weeks.
         return self._call_custom_question_api(prompt, analysis_type)
     
     def _build_standard_prompt(self, question: str, context: str) -> str:
-        """Build standard open-ended reasoning prompt."""
+        """Build standard open-ended reasoning prompt - simplified for reliability."""
         return f"""
-You are an expert workforce planning consultant and strategic advisor.
+You are a workforce planning expert. Answer this question:
 
-COMPANY CONTEXT:
+CONTEXT:
 {context}
 
-USER QUESTION: {question}
+QUESTION: {question}
 
-Provide a comprehensive analysis in valid JSON format (IMPORTANT: ensure all strings are properly escaped):
+Respond with ONLY this JSON (no markdown, no extra text):
 
 {{
-  "answer": "<direct, concise answer to the question>",
-  "key_factors_considered": [
-    "<factor 1>",
-    "<factor 2>"
-  ],
-  "analysis": "<2-3 sentences explaining your reasoning. If multiple paragraphs needed, use explicit paragraph breaks with [BREAK]>",
-  "recommendations": [
-    {{
-      "action": "<recommended action>",
-      "rationale": "<why>",
-      "expected_impact": "<what will happen>",
-      "risk": "<what could go wrong>",
-      "timeline": "<how long will it take>"
-    }}
-  ],
-  "alternative_perspectives": [
-    {{
-      "perspective": "<alternative viewpoint>",
-      "why_relevant": "<why consider this>",
-      "pros": "<advantages>",
-      "cons": "<disadvantages>"
-    }}
-  ],
-  "confidence_score": <0-100>,
-  "confidence_explanation": "<why this confidence level>"
+  "answer": "Direct answer to the question",
+  "reasoning": "Why you think this is the answer",
+  "recommendation": "What should be done",
+  "risk": "Key risks to consider",
+  "timeline": "Expected timeline or duration",
+  "confidence_score": 75
 }}
 
-IMPORTANT JSON RULES:
-- All quotes inside strings must be escaped with backslash
-- No actual newlines in string values - use [BREAK] for paragraph breaks instead
-- All special characters must be properly escaped
-- Output ONLY valid JSON, no markdown code fences
-
-Be specific with numbers and timelines. Consider industry best practices and realistic constraints.
+Keep all text concise. DO NOT use quotes or backslashes inside field values.
 """
     
     def _build_comparative_prompt(self, question: str, context: str) -> str:
-        """Build prompt for comparing multiple options."""
+        """Build prompt for comparing multiple options - simplified."""
         return f"""
-You are an expert workforce planning consultant.
+You are a workforce planning expert comparing options.
 
-COMPANY CONTEXT:
+CONTEXT:
 {context}
 
-USER QUESTION: {question}
+QUESTION: {question}
 
-The user is asking to compare different options or approaches. 
-Provide structured JSON comparing alternatives:
+Respond with ONLY this JSON (no markdown):
 
 {{
-  "question_analysis": "<breakdown of what's being compared>",
-  "options_compared": [
-    {{
-      "option_name": "<name of option>",
-      "description": "<what is this option>",
-      "pros": ["<pro 1>", "<pro 2>"],
-      "cons": ["<con 1>", "<con 2>"],
-      "timeline_impact": "<effect on timelines>",
-      "budget_impact": "<cost or savings>",
-      "risk_level": "<LOW, MEDIUM, HIGH>",
-      "implementation_difficulty": "<EASY, MODERATE, DIFFICULT>"
-    }}
-  ],
-  "recommended_option": {{
-    "choice": "<which option is best>",
-    "rationale": "<why this one>",
-    "conditions": ["<condition 1>", "<condition 2>"]
-  }},
-  "hybrid_approach": "<if combining options could work>",
-  "confidence_score": <0-100>
+  "option_a": "First option name",
+  "option_a_pros": "Advantages of option A",
+  "option_a_cons": "Disadvantages of option A",
+  "option_b": "Second option name",
+  "option_b_pros": "Advantages of option B", 
+  "option_b_cons": "Disadvantages of option B",
+  "recommendation": "Which option is better and why",
+  "timeline_impact": "How it affects your timeline",
+  "budget_impact": "Cost implications",
+  "confidence_score": 75
 }}
 
-IMPORTANT JSON RULES:
-- All quotes inside strings must be escaped with backslash
-- No actual newlines in string values - use [BREAK] for paragraph breaks instead
-- Output ONLY valid JSON
-
-Be analytical and data-driven in comparisons.
+Keep text concise. No quotes or backslashes in values.
 """
     
     def _build_sensitivity_prompt(self, question: str, context: str) -> str:
-        """Build prompt for sensitivity/what-if analysis."""
+        """Build prompt for sensitivity/what-if analysis - simplified."""
         return f"""
-You are an expert workforce planning consultant.
+You are a workforce planning expert. Analyze sensitivity/what-if scenarios.
 
-COMPANY CONTEXT:
+CONTEXT:
 {context}
 
-USER QUESTION: {question}
+QUESTION: {question}
 
-The user is interested in understanding how outcomes change with different assumptions.
-Provide JSON with sensitivity analysis:
+Respond with ONLY this JSON (no markdown):
 
 {{
-  "base_case": {{
-    "scenario": "<baseline scenario>",
-    "outcome": "<what happens if nothing changes>"
-  }},
-  "sensitivity_dimensions": [
-    {{
-      "variable": "<what's being changed>",
-      "best_case": {{
-        "value": "<optimistic value>",
-        "outcome": "<best case outcome>",
-        "confidence": <0-100>
-      }},
-      "worst_case": {{
-        "value": "<pessimistic value>",
-        "outcome": "<worst case outcome>",
-        "confidence": <0-100>
-      }}
-    }}
-  ],
-  "breakeven_analysis": "<what assumptions change the recommendation>",
-  "most_sensitive_to": "<which variable matters most>",
-  "recommendations": "<which scenario is most likely>",
-  "confidence_score": <0-100>
+  "best_case": "Most optimistic outcome",
+  "best_case_conditions": "When this would happen",
+  "base_case": "Most likely outcome",
+  "worst_case": "Most pessimistic outcome",
+  "worst_case_conditions": "When this would happen",
+  "most_critical_variable": "What matters most",
+  "why_critical": "Why this variable is important",
+  "recommendation": "Which scenario should you plan for",
+  "confidence_score": 72
 }}
 
-IMPORTANT JSON RULES:
-- Output ONLY valid JSON
-- No actual newlines in strings
-- Confirm all strings are properly escaped
-
-Identify the critical variables that matter most to the decision.
+Keep text concise. No quotes or backslashes in values.
 """
     
     def _build_hypothesis_prompt(self, question: str, context: str) -> str:
-        """Build prompt for validating user hypotheses/theories."""
+        """Build prompt for validating user hypotheses/theories - simplified."""
         return f"""
-You are an expert workforce planning consultant.
+You are a workforce planning expert. Validate the user's hypothesis.
 
-COMPANY CONTEXT:
+CONTEXT:
 {context}
 
-USER HYPOTHESIS/THEORY: {question}
+HYPOTHESIS: {question}
 
-The user has a theory or hypothesis about workforce planning. 
-Validate or challenge it with objective analysis. Output valid JSON:
+Respond with ONLY this JSON (no markdown):
 
 {{
-  "hypothesis": "<the user's theory restated>",
-  "assessment": "<LIKELY TRUE / UNCERTAIN / PROBABLY FALSE>",
-  "supporting_evidence": [
-    "<evidence supporting the hypothesis>",
-    "<another supporting evidence>"
-  ],
-  "contradicting_evidence": [
-    "<evidence contradicting the hypothesis>",
-    "<another contradicting evidence>"
-  ],
-  "conditions_for_truth": [
-    "<condition that must be met for hypothesis to be true>",
-    "<another condition>"
-  ],
-  "detailed_analysis": "<3-4 sentences of objective analysis>",
-  "recommendation": {{
-    "action": "<what to do based on analysis>",
-    "rationale": "<why>",
-    "monitoring_metrics": ["<metric to track>"]
-  }},
-  "confidence_score": <0-100>,
-  "needed_validation": ["<what data would confirm this>"]
+  "hypothesis": "The hypothesis restated clearly",
+  "is_likely": true,
+  "confidence_score": 68,
+  "supporting_evidence": "Evidence that supports this hypothesis",
+  "contradicting_evidence": "Evidence that contradicts this hypothesis",
+  "conditions_needed": "What conditions must be true for this to work",
+  "key_risks": "Main risks if you proceed with this assumption",
+  "recommendation": "What you should do based on this analysis"
 }}
 
-IMPORTANT JSON RULES:
-- Output ONLY valid JSON
-- No actual newlines in strings
-- Use [BREAK] for paragraph breaks in longer text
-- All quotes must be escaped
-
-Be balanced and consider both sides. Give honest assessment even if it contradicts the user's theory.
+Replace true/false for is_likely. Keep text concise. No special characters in values.
 """
     
     def _build_custom_context(
@@ -667,12 +585,12 @@ Please consider this context when answering the user's question.
 """
     
     def _call_custom_question_api(self, prompt: str, analysis_type: str) -> dict:
-        """Call Groq API for custom questions."""
+        """Call Groq API for custom questions - with robust JSON parsing."""
         
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
-                max_tokens=3000,  # Allow more tokens for detailed analysis
+                max_tokens=3000,
                 messages=[{"role": "user", "content": prompt}],
             )
             
@@ -683,39 +601,75 @@ Please consider this context when answering the user's question.
             json_end = response_text.rfind("}") + 1
             
             if json_start == -1 or json_end <= json_start:
-                raise ValueError("No JSON found in response")
+                return self._create_error_response(
+                    "No JSON found in response. AURORA couldn't format its answer properly.",
+                    analysis_type
+                )
             
             json_str = response_text[json_start:json_end]
             
-            # Clean JSON string: replace problematic control characters
-            # but preserve escaped sequences
-            json_str_clean = json_str.replace('\r', '').replace('\t', ' ')
+            # Aggressive JSON cleaning
+            json_str = self._clean_json_string(json_str)
             
-            # Try to parse with error recovery
+            # Try to parse
             try:
-                result = json.loads(json_str_clean)
+                result = json.loads(json_str)
+                result["analysis_type"] = analysis_type
+                result["full_response"] = response_text
+                return result
             except json.JSONDecodeError as je:
-                # If first attempt fails, try removing line breaks within string values
-                # This is a fallback for improperly formatted JSON
-                import re
-                # Replace actual newlines with spaces within quoted strings
-                json_str_fixed = re.sub(r'(?<=["\'])\n(?=["\'])', ' ', json_str_clean)
-                result = json.loads(json_str_fixed)
-            
-            result["analysis_type"] = analysis_type
-            result["full_response"] = response_text  # Store original for transparency
-            
-            return result
+                # If parsing still fails, return the raw text as fallback
+                return self._create_fallback_response(response_text, analysis_type, str(je))
         
         except Exception as e:
-            import traceback
-            error_msg = f"API Error: {str(e)}"
-            # Log the response for debugging if available
-            return {
-                "error": error_msg,
-                "analysis_type": analysis_type,
-                "confidence_score": 0,
-            }
+            return self._create_error_response(str(e), analysis_type)
+    
+    def _clean_json_string(self, json_str: str) -> str:
+        """Aggressively clean JSON string to fix escape issues."""
+        import re
+        
+        # Remove tabs and carriage returns
+        json_str = json_str.replace('\t', ' ').replace('\r', '')
+        
+        # Fix: Remove backslashes before non-escape characters
+        # Valid escapes in JSON: \", \\, \/, \b, \f, \n, \r, \t, \uXXXX
+        # Remove any backslash NOT followed by these
+        json_str = re.sub(r'\\(?!["\\/bfnrtu])', '', json_str)
+        
+        # Fix newlines within strings: replace actual newlines with \n
+        # This is tricky - we need to replace only newlines WITHIN quoted strings
+        # Strategy: find each quoted string and replace newlines inside
+        def fix_string_newlines(match):
+            # match.group(1) is the content inside quotes
+            content = match.group(1)
+            # Replace actual newlines with space (to preserve content)
+            content = content.replace('\n', ' ').replace('\r', ' ')
+            return f'"{content}"'
+        
+        # Match quoted strings and fix newlines in them
+        json_str = re.sub(r'"((?:\\.|[^"\\])*)"', fix_string_newlines, json_str)
+        
+        return json_str
+    
+    def _create_fallback_response(self, raw_text: str, analysis_type: str, parse_error: str) -> dict:
+        """Create a structured response from raw text when JSON parsing fails."""
+        # Try to extract useful information from the raw response
+        return {
+            "analysis_type": analysis_type,
+            "answer": raw_text[:500],  # First 500 chars as answer
+            "full_response": raw_text,
+            "confidence_score": 65,
+            "parse_error": parse_error,
+            "warning": "AURORA response was formatted differently than expected. Raw text shown above."
+        }
+    
+    def _create_error_response(self, error_msg: str, analysis_type: str) -> dict:
+        """Create consistent error response."""
+        return {
+            "error": f"API Error: {error_msg}",
+            "analysis_type": analysis_type,
+            "confidence_score": 0,
+        }
     
     # ===== HELPER METHODS =====
     

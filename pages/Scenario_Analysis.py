@@ -873,126 +873,108 @@ if api_ready:
                 st.markdown("### 📌 AURORA's Answer")
                 st.info(result.get("answer", "Analysis complete"))
                 
-                # For different modes, display relevant sections
-                if mode == "standard":
-                    # Key factors
-                    if result.get("key_factors_considered"):
-                        st.markdown("### 🎯 Key Factors Considered")
-                        for factor in result.get("key_factors_considered", []):
-                            st.write(f"• {factor}")
-                    
-                    # Detailed analysis
-                    if result.get("analysis"):
-                        st.markdown("### 📖 Detailed Analysis")
-                        st.write(result["analysis"])
-                    
-                    # Recommendations
-                    if result.get("recommendations"):
-                        st.markdown("### 💡 Recommendations")
-                        for i, rec in enumerate(result.get("recommendations", []), 1):
-                            with st.expander(f"**Option {i}: {rec.get('action', 'Recommendation')}**"):
-                                st.write(f"**Rationale:** {rec.get('rationale', 'N/A')}")
-                                st.write(f"**Expected Impact:** {rec.get('expected_impact', 'N/A')}")
-                                st.write(f"**Risk:** {rec.get('risk', 'N/A')}")
-                                st.write(f"**Timeline:** {rec.get('timeline', 'N/A')}")
-                    
-                    # Alternative perspectives
-                    if result.get("alternative_perspectives"):
-                        st.markdown("### 🔄 Alternative Perspectives")
-                        for alt in result.get("alternative_perspectives", []):
-                            with st.expander(f"**Alternative: {alt.get('perspective', 'View')}**"):
-                                st.write(f"**Why Relevant:** {alt.get('why_relevant', 'N/A')}")
-                                col1, col2 = st.columns(2)
-                                with col1:
-                                    st.write(f"**✅ Pros:**\n{alt.get('pros', 'N/A')}")
-                                with col2:
-                                    st.write(f"**❌ Cons:**\n{alt.get('cons', 'N/A')}")
+                # Display reasoning  
+                if result.get("reasoning"):
+                    st.markdown("### 💭 Reasoning")
+                    st.write(result["reasoning"])
                 
-                elif mode == "comparative":
+                # Mode-specific fields
+                if result.get("recommendation"):
+                    st.markdown("### 💡 Recommendation")
+                    st.success(result["recommendation"])
+                
+                if result.get("risk"):
+                    st.markdown("### ⚠️ Key Risks")
+                    st.warning(result["risk"])
+                
+                if result.get("timeline"):
+                    st.markdown("### ⏱️ Timeline")
+                    st.info(result["timeline"])
+                
+                # For comparative mode
+                if result.get("option_a"):
                     st.markdown("### ⚖️ Options Comparison")
                     
-                    # Display comparison table
-                    if result.get("options_compared"):
-                        comparison_data = []
-                        for opt in result.get("options_compared", []):
-                            comparison_data.append({
-                                "Option": opt.get("option_name", "Unknown"),
-                                "Timeline": opt.get("timeline_impact", "N/A"),
-                                "Budget": opt.get("budget_impact", "N/A"),
-                                "Risk": opt.get("risk_level", "N/A"),
-                                "Difficulty": opt.get("implementation_difficulty", "N/A"),
-                            })
-                        
-                        df_comparison = pd.DataFrame(comparison_data)
-                        st.dataframe(df_comparison, use_container_width=True)
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.markdown(f"#### ✅ {result.get('option_a', 'Option A')}")
+                        st.write(f"**Pros:** {result.get('option_a_pros', 'N/A')}")
+                        st.write(f"**Cons:** {result.get('option_a_cons', 'N/A')}")
                     
-                    # Recommended option
-                    if result.get("recommended_option"):
-                        rec = result["recommended_option"]
-                        st.markdown("### 🏆 Recommended Option")
-                        st.success(f"**{rec.get('choice', 'See details')}**")
-                        st.write(f"**Why:** {rec.get('rationale', 'N/A')}")
-                        if rec.get("conditions"):
-                            st.write("**Conditions:**")
-                            for cond in rec["conditions"]:
-                                st.write(f"• {cond}")
+                    with col2:
+                        st.markdown(f"#### ✅ {result.get('option_b', 'Option B')}")
+                        st.write(f"**Pros:** {result.get('option_b_pros', 'N/A')}")
+                        st.write(f"**Cons:** {result.get('option_b_cons', 'N/A')}")
+                    
+                    if result.get("timeline_impact"):
+                        st.write(f"**Timeline Impact:** {result['timeline_impact']}")
+                    if result.get("budget_impact"):
+                        st.write(f"**Budget Impact:** {result['budget_impact']}")
                 
-                elif mode == "sensitivity":
+                # For sensitivity mode
+                if result.get("best_case"):
                     st.markdown("### 📊 Sensitivity Analysis")
                     
-                    if result.get("sensitivity_dimensions"):
-                        for dim in result.get("sensitivity_dimensions", []):
-                            with st.expander(f"**Variable: {dim.get('variable', 'Unknown')}**"):
-                                col1, col2, col3 = st.columns(3)
-                                
-                                best = dim.get("best_case", {})
-                                base = dim.get("base_case", {})
-                                worst = dim.get("worst_case", {})
-                                
-                                with col1:
-                                    st.success(f"**Best Case**\nValue: {best.get('value', 'N/A')}\nOutcome: {best.get('outcome', 'N/A')}\nConfidence: {best.get('confidence', 0)}%")
-                                with col2:
-                                    st.info(f"**Base Case**\nValue: {base.get('value', 'N/A')}\nOutcome: {base.get('outcome', 'N/A')}\nConfidence: {base.get('confidence', 0)}%")
-                                with col3:
-                                    st.error(f"**Worst Case**\nValue: {worst.get('value', 'N/A')}\nOutcome: {worst.get('outcome', 'N/A')}\nConfidence: {worst.get('confidence', 0)}%")
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.success(f"**Best Case**\n{result.get('best_case', 'N/A')}")
+                        if result.get("best_case_conditions"):
+                            st.caption(f"When: {result['best_case_conditions']}")
                     
-                    if result.get("most_sensitive_to"):
-                        st.warning(f"**Most Critical Variable:** {result['most_sensitive_to']}")
+                    with col2:
+                        st.info(f"**Base Case**\n{result.get('base_case', 'N/A')}")
+                    
+                    with col3:
+                        st.error(f"**Worst Case**\n{result.get('worst_case', 'N/A')}")
+                        if result.get("worst_case_conditions"):
+                            st.caption(f"When: {result['worst_case_conditions']}")
+                    
+                    if result.get("most_critical_variable"):
+                        st.warning(f"**Most Critical:** {result['most_critical_variable']} - {result.get('why_critical', '')}")
                 
-                elif mode == "hypothesis":
+                # For hypothesis mode
+                if result.get("is_likely") is not None:
                     st.markdown("### 🔬 Hypothesis Analysis")
                     
-                    assessment = result.get("assessment", "UNCERTAIN")
-                    if "TRUE" in assessment.upper():
-                        st.success(f"### ✅ {assessment}")
-                    elif "FALSE" in assessment.upper():
-                        st.error(f"### ❌ {assessment}")
+                    is_likely = result.get("is_likely", False)
+                    if is_likely:
+                        st.success("### ✅ Hypothesis is LIKELY TRUE")
                     else:
-                        st.warning(f"### ⚠️ {assessment}")
+                        st.error("### ❌ Hypothesis is UNLIKELY")
                     
-                    st.write(result.get("detailed_analysis", ""))
-                    
-                    # Evidence
                     col1, col2 = st.columns(2)
                     with col1:
                         st.markdown("**Supporting Evidence:**")
-                        for ev in result.get("supporting_evidence", []):
-                            st.write(f"✓ {ev}")
+                        st.write(result.get("supporting_evidence", "N/A"))
                     
                     with col2:
                         st.markdown("**Contradicting Evidence:**")
-                        for ev in result.get("contradicting_evidence", []):
-                            st.write(f"✗ {ev}")
+                        st.write(result.get("contradicting_evidence", "N/A"))
+                    
+                    if result.get("conditions_needed"):
+                        st.markdown("**Conditions Needed:**")
+                        st.write(result["conditions_needed"])
+                    
+                    if result.get("key_risks"):
+                        st.markdown("**Key Risks:**")
+                        st.warning(result["key_risks"])
                 
                 # Confidence score (shown for all modes)
                 st.markdown("---")
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.markdown("**Confidence Explanation:**")
-                    st.write(result.get("confidence_explanation", "N/A"))
-                with col2:
-                    confidence = result.get("confidence_score", 0)
-                    st.metric("Confidence", f"{confidence}%")
+                confidence = result.get("confidence_score", 0)
+                st.metric("AURORA Confidence", f"{confidence}%")
+                
+                # Show warning if there was a parse issue
+                if result.get("parse_error"):
+                    st.warning(f"⚠️ Response formatting issue: {result.get('warning', 'Response was parsed differently than expected.')}")
+            
+            elif result.get("parse_error"):
+                # Fallback display for parse errors
+                st.warning("⚠️ Response formatting issue")
+                st.write(result.get("answer", "AURORA had trouble formatting its response."))
+                if result.get("full_response"):
+                    with st.expander("📋 Raw response"):
+                        st.code(result["full_response"])
             
             else:
                 st.error(f"❌ Error: {result.get('error')}")
