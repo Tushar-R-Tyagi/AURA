@@ -21,6 +21,7 @@ def render_sidebar_navigation() -> None:
     render_navigation_link(st.sidebar, "pages/Stammdaten_Management.py", "Stammdaten Management", "🛠️", "Team-, Produkt- und Komponentendaten")
     render_navigation_link(st.sidebar, "pages/Projekt_Allocation.py", "Projekt-Allocation", "📅", "Kapazitäten und Allokationen")
     render_navigation_link(st.sidebar, "pages/Finanzielle_Verwaltung.py", "Finanzielle Verwaltung", "💰", "Budget und Kosten")
+    render_navigation_link(st.sidebar, "pages/Scenario_Analysis.py", "🤖 Scenario Analysis AI", "🤖", "AI-gestützte What-If Szenarien und Entscheidungshilfen")
     st.sidebar.markdown("---")
 
 
