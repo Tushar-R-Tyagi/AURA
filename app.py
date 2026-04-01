@@ -137,10 +137,8 @@ def main():
     render_sidebar_navigation()
     
     # KOPFZEILE
-    st.markdown('<h1 class="main-header">🏢 AURA Executive Dashboard</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">🏢 AURA </h1>', unsafe_allow_html=True)
     colors = get_colors()
-    st.markdown(f'<p style="text-align: center; font-size: 1.2rem; color: {colors["text_secondary"]};">Leadership view for capacity, continuity and staffing risk</p>', unsafe_allow_html=True)
-
     
     # Initialize component map
     if 'component_map' not in st.session_state:

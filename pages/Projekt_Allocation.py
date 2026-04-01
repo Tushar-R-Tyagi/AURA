@@ -218,117 +218,121 @@ if st.session_state.project_allocations:
             )
 
         # Validate date range
-        if gantt_start_date >= gantt_end_date:
-            st.error("⚠️ Enddatum muss nach dem Startdatum liegen!")
-            gantt_end_date = gantt_start_date + timedelta(days=30)  # Default to 1 month
+        if gantt_start_date and gantt_end_date:
+            if gantt_start_date >= gantt_end_date:
+                st.error("⚠️ Enddatum muss nach dem Startdatum liegen!")
+                gantt_end_date = gantt_start_date + timedelta(days=30)  # Default to 1 month
+        else:
+            st.warning("⚠️ Bitte wählen Sie beide Daten aus!")
 
         # Filter allocations for the selected period
         filtered_allocations = []
-        for alloc in st.session_state.project_allocations:
-            # Include allocation if it overlaps with the selected period
-            if not (alloc['end_date'] < gantt_start_date or alloc['start_date'] > gantt_end_date):
-                filtered_allocations.append(alloc)
+        if gantt_start_date and gantt_end_date:
+            for alloc in st.session_state.project_allocations:
+                # Include allocation if it overlaps with the selected period
+                if not (alloc['end_date'] < gantt_start_date or alloc['start_date'] > gantt_end_date):
+                    filtered_allocations.append(alloc)
 
-        st.info(f"📊 Zeige {len(filtered_allocations)} von {len(st.session_state.project_allocations)} Allokationen im Zeitraum {gantt_start_date.strftime('%Y-%m')} bis {gantt_end_date.strftime('%Y-%m')}")
+            st.info(f"📊 Zeige {len(filtered_allocations)} von {len(st.session_state.project_allocations)} Allokationen im Zeitraum {gantt_start_date.strftime('%Y-%m')} bis {gantt_end_date.strftime('%Y-%m')}")
 
-        if filtered_allocations:
-            # Create Gantt chart data with filtered allocations
-            gantt_data = []
+            if filtered_allocations:
+                # Create Gantt chart data with filtered allocations
+                gantt_data = []
 
-            for alloc in filtered_allocations:
-                # Get employee info
-                employee_info = df_team[df_team['name'] == alloc['employee']].iloc[0] if not df_team[df_team['name'] == alloc['employee']].empty else None
+                for alloc in filtered_allocations:
+                    # Get employee info
+                    employee_info = df_team[df_team['name'] == alloc['employee']].iloc[0] if not df_team[df_team['name'] == alloc['employee']].empty else None
 
-                if employee_info is not None:
-                    # Calculate FTE based on allocation percentage
-                    fte_value = alloc['percentage'] / 100.0
+                    if employee_info is not None:
+                        # Calculate FTE based on allocation percentage
+                        fte_value = alloc['percentage'] / 100.0
 
-                    gantt_data.append({
-                        'Task': f"{alloc['employee']} ({alloc['project']})",
-                        'Start': alloc['start_date'],
-                        'Finish': alloc['end_date'],
-                        'Resource': alloc['project'],
-                        'Percentage': alloc['percentage'],
-                        'FTE': fte_value,
-                        'Employee_Type': employee_info['employee_type'],
-                        'Role': employee_info['role']
-                    })
+                        gantt_data.append({
+                            'Task': f"{alloc['employee']} ({alloc['project']})",
+                            'Start': alloc['start_date'],
+                            'Finish': alloc['end_date'],
+                            'Resource': alloc['project'],
+                            'Percentage': alloc['percentage'],
+                            'FTE': fte_value,
+                            'Employee_Type': employee_info['employee_type'],
+                            'Role': employee_info['role']
+                        })
 
-            if gantt_data:
-                df_gantt = pd.DataFrame(gantt_data)
+                if gantt_data:
+                    df_gantt = pd.DataFrame(gantt_data)
 
-                # Make sure date types are accepted by plotly (datetime64)
-                df_gantt['Start'] = pd.to_datetime(df_gantt['Start'])
-                df_gantt['Finish'] = pd.to_datetime(df_gantt['Finish'])
+                    # Make sure date types are accepted by plotly (datetime64)
+                    df_gantt['Start'] = pd.to_datetime(df_gantt['Start'])
+                    df_gantt['Finish'] = pd.to_datetime(df_gantt['Finish'])
 
-                # Create Gantt chart with plotly.express timeline for reliable bars
-                fig = px.timeline(
-                    df_gantt,
-                    x_start='Start',
-                    x_end='Finish',
-                    y='Task',
-                    color='Resource',
-                    color_discrete_map=PROJECT_COLORS,
-                    hover_data=['Percentage', 'FTE', 'Employee_Type', 'Role']
-                )
-
-                # Add percentage labels on each bar
-                for idx, row in df_gantt.iterrows():
-                    mid_date = row['Start'] + (row['Finish'] - row['Start']) / 2
-                    fig.add_annotation(
-                        x=mid_date,
-                        y=row['Task'],
-                        text=f"{row['Percentage']:.0f}%",
-                        showarrow=False,
-                        font=dict(color='white', size=12, family='Arial Black'),
-                        bgcolor='rgba(0,0,0,0.3)',
-                        bordercolor='rgba(255,255,255,0.5)',
-                        borderwidth=1,
-                        borderpad=4,
-                        ax=0,
-                        ay=0
+                    # Create Gantt chart with plotly.express timeline for reliable bars
+                    fig = px.timeline(
+                        df_gantt,
+                        x_start='Start',
+                        x_end='Finish',
+                        y='Task',
+                        color='Resource',
+                        color_discrete_map=PROJECT_COLORS,
+                        hover_data=['Percentage', 'FTE', 'Employee_Type', 'Role']
                     )
 
-                fig.update_yaxes(autorange='reversed')
-                fig.update_layout(
-                    title=f"Projekt-Allocation Gantt-Chart ({gantt_start_date.strftime('%Y-%m')} bis {gantt_end_date.strftime('%Y-%m')})",
-                    xaxis_title='Zeitraum',
-                    yaxis_title='Mitarbeiter (Projekt)',
-                    height=max(400, len(df_gantt) * 30),
-                    legend_title='Projekt'
-                )
+                    # Add percentage labels on each bar
+                    for idx, row in df_gantt.iterrows():
+                        mid_date = row['Start'] + (row['Finish'] - row['Start']) / 2
+                        fig.add_annotation(
+                            x=mid_date,
+                            y=row['Task'],
+                            text=f"{row['Percentage']:.0f}%",
+                            showarrow=False,
+                            font=dict(color='white', size=12, family='Arial Black'),
+                            bgcolor='rgba(0,0,0,0.3)',
+                            bordercolor='rgba(255,255,255,0.5)',
+                            borderwidth=1,
+                            borderpad=4,
+                            ax=0,
+                            ay=0
+                        )
 
-                fig.update_xaxes(type='date', range=[gantt_start_date, gantt_end_date])
+                    fig.update_yaxes(autorange='reversed')
+                    fig.update_layout(
+                        title=f"Projekt-Allocation Gantt-Chart ({gantt_start_date.strftime('%Y-%m')} bis {gantt_end_date.strftime('%Y-%m')})",
+                        xaxis_title='Zeitraum',
+                        yaxis_title='Mitarbeiter (Projekt)',
+                        height=max(400, len(df_gantt) * 30),
+                        legend_title='Projekt'
+                    )
 
-                st.plotly_chart(fig, use_container_width=True)
+                    fig.update_xaxes(type='date', range=[gantt_start_date, gantt_end_date])
 
-                # Summary statistics for filtered period
-                st.markdown("#### 📈 Zusammenfassung für ausgewählten Zeitraum")
+                    st.plotly_chart(fig, use_container_width=True)
 
-                col1, col2, col3 = st.columns(3)
+                    # Summary statistics for filtered period
+                    st.markdown("#### 📈 Zusammenfassung für ausgewählten Zeitraum")
 
-                for i, project in enumerate(PROJECTS):
-                    project_allocs = df_gantt[df_gantt['Resource'] == project]
-                    total_fte_months = 0
+                    col1, col2, col3 = st.columns(3)
 
-                    for idx, row in project_allocs.iterrows():
-                        # Convert Timestamp to date for comparison
-                        row_start = row['Start'].date() if hasattr(row['Start'], 'date') else row['Start']
-                        row_end = row['Finish'].date() if hasattr(row['Finish'], 'date') else row['Finish']
+                    for i, project in enumerate(PROJECTS):
+                        project_allocs = df_gantt[df_gantt['Resource'] == project]
+                        total_fte_months = 0
 
-                        # Calculate actual months shown in the filtered period
-                        actual_start = max(row_start, gantt_start_date)
-                        actual_end = min(row_end, gantt_end_date)
-                        if actual_start < actual_end:
-                            months_diff = (actual_end.year - actual_start.year) * 12 + (actual_end.month - actual_start.month) + 1
-                            total_fte_months += row['FTE'] * months_diff
+                        for idx, row in project_allocs.iterrows():
+                            # Convert Timestamp to date for comparison
+                            row_start = row['Start'].date() if hasattr(row['Start'], 'date') else row['Start']
+                            row_end = row['Finish'].date() if hasattr(row['Finish'], 'date') else row['Finish']
 
-                    with [col1, col2, col3][i]:
-                        st.metric(f"{project} FTE-Monate", f"{total_fte_months:.1f}")
-            else:
-                st.info("Keine Allokationen im ausgewählten Zeitraum gefunden.")
+                            # Calculate actual months shown in the filtered period
+                            actual_start = max(row_start, gantt_start_date)
+                            actual_end = min(row_end, gantt_end_date)
+                            if actual_start < actual_end:
+                                months_diff = (actual_end.year - actual_start.year) * 12 + (actual_end.month - actual_start.month) + 1
+                                total_fte_months += row['FTE'] * months_diff
+
+                        with [col1, col2, col3][i]:
+                            st.metric(f"{project} FTE-Monate", f"{total_fte_months:.1f}")
+                else:
+                    st.info("Keine Allokationen im ausgewählten Zeitraum gefunden.")
         else:
-            st.info("Keine Allokationen im ausgewählten Zeitraum gefunden.")
+            st.info("Bitte wählen Sie einen gültigen Zeitraum aus.")
     else:
         st.info("Keine Allokationsdaten verfügbar.")
 else:

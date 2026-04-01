@@ -131,9 +131,9 @@ DEFAULT_BUDGET_DATA = {
 
 DEFAULT_PROJECTS = ["CG", "iUZ", "iBS"]
 DEFAULT_PROJECT_COLORS = {
-    "CG": "#FF6B6B",
-    "iUZ": "#4ECDC4",
-    "iBS": "#45B7D1",
+    "CG": "#FF1744",
+    "iUZ": "#FFEA00",
+    "iBS": "#00E676",
 }
 
 PERSISTED_STATE_DEFAULTS = {
