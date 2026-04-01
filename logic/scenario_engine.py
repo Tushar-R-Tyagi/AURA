@@ -52,7 +52,7 @@ class AurorAI:
                 "Set via environment variable or pass to __init__"
             )
         self.client = Groq(api_key=self.api_key)
-        self.model = "mixtral-8x7b-32768"  # Fast and powerful Groq model
+        self.model = "llama-3.1-70b-versatile"  # Current supported Groq model
     
     def simulate_hiring_delay(
         self,
