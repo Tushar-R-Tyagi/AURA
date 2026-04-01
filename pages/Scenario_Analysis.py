@@ -77,20 +77,28 @@ if not api_ready:
             st.info("✅ API key set for this session. Refresh the page to use it.")
 
 if api_ready:
-    # Main scenario selection
-    scenario_type = st.selectbox(
-        "📊 What scenario do you want to explore?",
-        [
-            "--- Select a scenario ---",
-            "Hiring Impact: Delay hiring for a component",
-            "Employee Impact: Add a new hire",
-            "Component Risk: Assess risk for a component",
-            "Hiring Priority: Where should we hire first?",
-            "Knowledge Transfer: Will KT succeed?",
-        ]
-    )
+    # Create tabs for different modes
+    tab1, tab2 = st.tabs([
+        "📋 Predefined Scenarios",
+        "🤔 Ask AURORA Anything"
+    ])
+    
+    # ==================== TAB 1: PREDEFINED SCENARIOS ====================
+    with tab1:
+        # Main scenario selection
+        scenario_type = st.selectbox(
+            "📊 What scenario do you want to explore?",
+            [
+                "--- Select a scenario ---",
+                "Hiring Impact: Delay hiring for a component",
+                "Employee Impact: Add a new hire",
+                "Component Risk: Assess risk for a component",
+                "Hiring Priority: Where should we hire first?",
+                "Knowledge Transfer: Will KT succeed?",
+            ]
+        )
 
-    st.markdown("---")
+        st.markdown("---")
 
     # ===== SCENARIO 1: HIRING DELAY =====
     if scenario_type == "Hiring Impact: Delay hiring for a component":
@@ -783,6 +791,211 @@ if api_ready:
 
                     else:
                         st.error(f"❌ Error: {results.get('error')}")
+    
+    # ==================== TAB 2: CUSTOM QUERY ====================
+    with tab2:
+        st.markdown("### 🤔 Ask AURORA Anything")
+        st.markdown(
+            "Ask complex workforce questions and get AI-powered analysis. "
+            "No predefined scenarios needed!"
+        )
+        
+        st.markdown("---")
+        
+        # Analysis type selection
+        col1, col2 = st.columns(2)
+        with col1:
+            analysis_type = st.selectbox(
+                "Analysis Type",
+                [
+                    "standard: Direct answer to your question",
+                    "comparative: Compare multiple options",
+                    "sensitivity: Explore parameter ranges",
+                    "hypothesis: Validate a theory",
+                ],
+                help="Choose how AURORA should analyze your question"
+            )
+            # Extract just the mode name
+            mode = analysis_type.split(":")[0]
+        
+        with col2:
+            include_team = st.checkbox("Include team data", value=True)
+            include_components = st.checkbox("Include projects/components", value=True)
+            include_budget = st.checkbox("Include budget info", value=True)
+        
+        st.markdown("---")
+        
+        # Question input
+        st.markdown("#### 📝 Your Question")
+        user_question = st.text_area(
+            "What do you want to know about your workforce?",
+            placeholder="Examples:\n- Can we deliver with 20% fewer people?\n- What if we delay hiring for 3 months?\n- Should we hire 2 juniors or 1 senior?\n- What's the impact of losing our lead architect?",
+            height=100,
+            label_visibility="collapsed"
+        )
+        
+        # Prepare context data
+        context_data_prepared = {
+            "team": st.session_state.team_data if include_team else None,
+            "components": st.session_state.get("components_data") if include_components else None,
+            "budget": {
+                "total_budget_euros": 500000,  # Example - you might get from db
+                "spent_euros": 250000,
+            } if include_budget else None,
+        }
+        
+        # Ask button
+        if st.button("🚀 Get AURORA Analysis", type="primary", use_container_width=True):
+            if not user_question.strip():
+                st.error("❌ Please enter a question")
+            else:
+                with st.spinner(f"🤔 AURORA analyzing... ({mode} mode)"):
+                    result = aurora.ask_custom_question(
+                        question=user_question,
+                        team_data=context_data_prepared["team"],
+                        components_data=context_data_prepared["components"],
+                        budget_data=context_data_prepared["budget"],
+                        analysis_type=mode,
+                    )
+                    
+                    st.session_state.scenario_results = result
+                    st.rerun()
+        
+        # Display custom query results
+        if st.session_state.scenario_results and st.session_state.scenario_results.get("analysis_type") == mode:
+            result = st.session_state.scenario_results
+            
+            if "error" not in result:
+                st.success("✅ AURORA Analysis Complete")
+                st.markdown("---")
+                
+                # Main answer
+                st.markdown("### 📌 AURORA's Answer")
+                st.info(result.get("answer", "Analysis complete"))
+                
+                # For different modes, display relevant sections
+                if mode == "standard":
+                    # Key factors
+                    if result.get("key_factors_considered"):
+                        st.markdown("### 🎯 Key Factors Considered")
+                        for factor in result.get("key_factors_considered", []):
+                            st.write(f"• {factor}")
+                    
+                    # Detailed analysis
+                    if result.get("analysis"):
+                        st.markdown("### 📖 Detailed Analysis")
+                        st.write(result["analysis"])
+                    
+                    # Recommendations
+                    if result.get("recommendations"):
+                        st.markdown("### 💡 Recommendations")
+                        for i, rec in enumerate(result.get("recommendations", []), 1):
+                            with st.expander(f"**Option {i}: {rec.get('action', 'Recommendation')}**"):
+                                st.write(f"**Rationale:** {rec.get('rationale', 'N/A')}")
+                                st.write(f"**Expected Impact:** {rec.get('expected_impact', 'N/A')}")
+                                st.write(f"**Risk:** {rec.get('risk', 'N/A')}")
+                                st.write(f"**Timeline:** {rec.get('timeline', 'N/A')}")
+                    
+                    # Alternative perspectives
+                    if result.get("alternative_perspectives"):
+                        st.markdown("### 🔄 Alternative Perspectives")
+                        for alt in result.get("alternative_perspectives", []):
+                            with st.expander(f"**Alternative: {alt.get('perspective', 'View')}**"):
+                                st.write(f"**Why Relevant:** {alt.get('why_relevant', 'N/A')}")
+                                col1, col2 = st.columns(2)
+                                with col1:
+                                    st.write(f"**✅ Pros:**\n{alt.get('pros', 'N/A')}")
+                                with col2:
+                                    st.write(f"**❌ Cons:**\n{alt.get('cons', 'N/A')}")
+                
+                elif mode == "comparative":
+                    st.markdown("### ⚖️ Options Comparison")
+                    
+                    # Display comparison table
+                    if result.get("options_compared"):
+                        comparison_data = []
+                        for opt in result.get("options_compared", []):
+                            comparison_data.append({
+                                "Option": opt.get("option_name", "Unknown"),
+                                "Timeline": opt.get("timeline_impact", "N/A"),
+                                "Budget": opt.get("budget_impact", "N/A"),
+                                "Risk": opt.get("risk_level", "N/A"),
+                                "Difficulty": opt.get("implementation_difficulty", "N/A"),
+                            })
+                        
+                        df_comparison = pd.DataFrame(comparison_data)
+                        st.dataframe(df_comparison, use_container_width=True)
+                    
+                    # Recommended option
+                    if result.get("recommended_option"):
+                        rec = result["recommended_option"]
+                        st.markdown("### 🏆 Recommended Option")
+                        st.success(f"**{rec.get('choice', 'See details')}**")
+                        st.write(f"**Why:** {rec.get('rationale', 'N/A')}")
+                        if rec.get("conditions"):
+                            st.write("**Conditions:**")
+                            for cond in rec["conditions"]:
+                                st.write(f"• {cond}")
+                
+                elif mode == "sensitivity":
+                    st.markdown("### 📊 Sensitivity Analysis")
+                    
+                    if result.get("sensitivity_dimensions"):
+                        for dim in result.get("sensitivity_dimensions", []):
+                            with st.expander(f"**Variable: {dim.get('variable', 'Unknown')}**"):
+                                col1, col2, col3 = st.columns(3)
+                                
+                                best = dim.get("best_case", {})
+                                base = dim.get("base_case", {})
+                                worst = dim.get("worst_case", {})
+                                
+                                with col1:
+                                    st.success(f"**Best Case**\nValue: {best.get('value', 'N/A')}\nOutcome: {best.get('outcome', 'N/A')}\nConfidence: {best.get('confidence', 0)}%")
+                                with col2:
+                                    st.info(f"**Base Case**\nValue: {base.get('value', 'N/A')}\nOutcome: {base.get('outcome', 'N/A')}\nConfidence: {base.get('confidence', 0)}%")
+                                with col3:
+                                    st.error(f"**Worst Case**\nValue: {worst.get('value', 'N/A')}\nOutcome: {worst.get('outcome', 'N/A')}\nConfidence: {worst.get('confidence', 0)}%")
+                    
+                    if result.get("most_sensitive_to"):
+                        st.warning(f"**Most Critical Variable:** {result['most_sensitive_to']}")
+                
+                elif mode == "hypothesis":
+                    st.markdown("### 🔬 Hypothesis Analysis")
+                    
+                    assessment = result.get("assessment", "UNCERTAIN")
+                    if "TRUE" in assessment.upper():
+                        st.success(f"### ✅ {assessment}")
+                    elif "FALSE" in assessment.upper():
+                        st.error(f"### ❌ {assessment}")
+                    else:
+                        st.warning(f"### ⚠️ {assessment}")
+                    
+                    st.write(result.get("detailed_analysis", ""))
+                    
+                    # Evidence
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.markdown("**Supporting Evidence:**")
+                        for ev in result.get("supporting_evidence", []):
+                            st.write(f"✓ {ev}")
+                    
+                    with col2:
+                        st.markdown("**Contradicting Evidence:**")
+                        for ev in result.get("contradicting_evidence", []):
+                            st.write(f"✗ {ev}")
+                
+                # Confidence score (shown for all modes)
+                st.markdown("---")
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.markdown("**Confidence Explanation:**")
+                    st.write(result.get("confidence_explanation", "N/A"))
+                with col2:
+                    confidence = result.get("confidence_score", 0)
+                    st.metric("Confidence", f"{confidence}%")
+            
+            else:
+                st.error(f"❌ Error: {result.get('error')}")
 
 else:
     st.info("⚠️ Waiting for API configuration...")
