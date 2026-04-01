@@ -9,6 +9,13 @@ from dotenv import load_dotenv
 from database.session_store import ensure_session_state
 from logic.scenario_engine import AurorAI
 from logic.team_service import build_team_dataframe
+from logic.visualization_service import (
+    create_timeline_impact_chart,
+    create_budget_impact_chart,
+    create_risk_gauge_chart,
+    create_confidence_gauge_chart,
+    create_alternatives_comparison,
+)
 from ui.theme import load_theme, render_sidebar_navigation
 
 # Load environment variables from .env file
@@ -211,6 +218,38 @@ if api_ready:
                         help="How confident is the AI in this prediction?"
                     )
 
+                # Prognose visualizations
+                st.markdown("### 📊 Prognose & Visualisierungen")
+                
+                viz_col1, viz_col2 = st.columns(2)
+                
+                with viz_col1:
+                    timeline_chart = create_timeline_impact_chart(
+                        timeline_impact, 
+                        selected_component
+                    )
+                    st.plotly_chart(timeline_chart, use_container_width=True)
+                
+                with viz_col2:
+                    budget_chart = create_budget_impact_chart(
+                        budget_impact,
+                        selected_component
+                    )
+                    st.plotly_chart(budget_chart, use_container_width=True)
+                
+                viz_col3, viz_col4 = st.columns(2)
+                
+                with viz_col3:
+                    risk_chart = create_risk_gauge_chart(
+                        risk_increase,
+                        selected_component
+                    )
+                    st.plotly_chart(risk_chart, use_container_width=True)
+                
+                with viz_col4:
+                    conf_chart = create_confidence_gauge_chart(confidence)
+                    st.plotly_chart(conf_chart, use_container_width=True)
+
                 # Recommendation
                 st.markdown("### 🎯 AI Recommendation")
                 recommendation = results.get("recommendation", "No recommendation")
@@ -225,6 +264,10 @@ if api_ready:
                 # Alternatives
                 if results.get("alternatives"):
                     st.markdown("### 💡 Alternative Approaches")
+                    
+                    # Show comparison chart
+                    alt_chart = create_alternatives_comparison(results["alternatives"])
+                    st.plotly_chart(alt_chart, use_container_width=True)
 
                     for i, alt in enumerate(results["alternatives"], 1):
                         with st.expander(f"Option {i}: {alt.get('option', 'Alternative')}"):
