@@ -163,8 +163,8 @@ if api_ready:
                         current_staffing=len([
                             t for t in st.session_state.team_data
                             if selected_component in (t.get("components") or "").split(",")
-                        ]),
-                        required_staffing=comp_data.get("required_resources", 1),
+                        ]) + (1 if comp_data.get("backup_available", False) else 0),
+                        required_staffing=int(comp_data.get("required_resources", 1)) + (1 if comp_data.get("backup_available", False) else 0),
                         component_criticality=criticality,
                         budget_remaining_euros=budget_remaining,
                         team_data=st.session_state.team_data,
@@ -471,8 +471,8 @@ if api_ready:
                         current_staffing=len([
                             t for t in st.session_state.team_data
                             if selected_component in (t.get("components") or "").split(",")
-                        ]),
-                        required_staffing=comp_data.get("required_resources", 1),
+                        ]) + (1 if comp_data.get("backup_available", False) else 0),
+                        required_staffing=int(comp_data.get("required_resources", 1)) + (1 if comp_data.get("backup_available", False) else 0),
                         responsible_persons=comp_data.get("responsible_persons", []),
                         knowledge_transfer_status=comp_data.get(
                             "knowledge_transfer_status", "Unknown"
