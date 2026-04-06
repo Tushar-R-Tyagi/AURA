@@ -31,6 +31,7 @@ ensure_session_state()
 load_theme()
 render_sidebar_navigation()
 st.session_state.setdefault("editing_index", None)
+st.session_state.setdefault("component_editing_index", None)
 
 
 def parse_component_names(value):
@@ -40,6 +41,12 @@ def parse_component_names(value):
     else:
         raw_items = str(value or "").split(",")
     return [str(item).strip() for item in raw_items if str(item).strip()]
+
+
+def required_with_backup(component: dict) -> int:
+    """Return required headcount including backup coverage if enabled."""
+    base_required = int(component.get("required_resources", 1) or 1)
+    return base_required + 1 if component.get("backup_available", False) else base_required
 
 
 # ============= BULK IMPORT HELPER FUNCTIONS =============
@@ -303,7 +310,7 @@ def sync_master_data_to_legacy_state():
         responsible_people = parse_component_names(component.get("responsible_persons", []))
         component_map[component_name] = responsible_people
         component_products[component_name] = component.get("product_name", "Unknown")
-        component_requirements[component_name] = int(component.get("required_resources", 1))
+        component_requirements[component_name] = required_with_backup(component)
         component_transfer_times[component_name] = int(component.get("knowledge_transfer_time_needed", 6))
 
     st.session_state.component_map = component_map
@@ -855,6 +862,139 @@ with master_tab:
                     st.error("Bitte geben Sie einen Namen ein und wählen Sie mindestens eine verantwortliche Person aus.")
 
     st.markdown("---")
+
+    st.markdown("#### ✏️ Komponente bearbeiten")
+    component_names = [item.get("component_name") for item in st.session_state.components_data if item.get("component_name")]
+    if component_names:
+        filter_col1, filter_col2 = st.columns(2)
+        with filter_col1:
+            edit_product_filter = st.selectbox(
+                "Produkt (Filter)",
+                options=["Alle Produkte"] + product_options,
+                key="component_edit_product_filter",
+            )
+
+        filtered_components = [
+            item.get("component_name")
+            for item in st.session_state.components_data
+            if item.get("component_name")
+            and (
+                edit_product_filter == "Alle Produkte"
+                or item.get("product_name") == edit_product_filter
+            )
+        ]
+
+        if not filtered_components:
+            st.info("Für dieses Produkt sind aktuell keine Komponenten hinterlegt.")
+            selected_component_to_edit = None
+        else:
+            with filter_col2:
+                selected_component_to_edit = st.selectbox(
+                    "Bestehende Komponente",
+                    options=filtered_components,
+                    key="component_edit_selector",
+                )
+
+        selected_component_index = next(
+            (idx for idx, comp in enumerate(st.session_state.components_data) if comp.get("component_name") == selected_component_to_edit),
+            None,
+        ) if selected_component_to_edit else None
+        if selected_component_index is not None:
+            selected_component = st.session_state.components_data[selected_component_index]
+            edit_key_suffix = f"{selected_component_index}"
+            with st.form("edit_component_form"):
+                edit_col1, edit_col2 = st.columns(2)
+                with edit_col1:
+                    edit_component_name = st.text_input(
+                        "Komponentenname",
+                        value=selected_component.get("component_name", ""),
+                        help="Wählen Sie die bestehende Komponente oben aus; hier können Sie den Namen bei Bedarf anpassen.",
+                        key=f"edit_component_name_{edit_key_suffix}",
+                    )
+                    edit_product_name = st.selectbox(
+                        "Produkt",
+                        options=product_options,
+                        index=product_options.index(selected_component.get("product_name")) if selected_component.get("product_name") in product_options else 0,
+                        key=f"edit_component_product_{edit_key_suffix}",
+                    )
+                    edit_responsible_persons = st.multiselect(
+                        "Verantwortliche Person(en)",
+                        options=[member["name"] for member in st.session_state.team_data],
+                        default=selected_component.get("responsible_persons", []),
+                        key=f"edit_component_responsible_{edit_key_suffix}",
+                    )
+                    edit_backup_available = st.checkbox(
+                        "Backup verfügbar (zählt +1 Headcount im Bedarf)",
+                        value=bool(selected_component.get("backup_available", False)),
+                        key=f"edit_component_backup_{edit_key_suffix}",
+                    )
+
+                with edit_col2:
+                    edit_complexity_score = st.slider(
+                        "Komplexität (1-10)",
+                        min_value=1,
+                        max_value=10,
+                        value=int(selected_component.get("complexity_score", 5) or 5),
+                        key=f"edit_component_complexity_{edit_key_suffix}",
+                    )
+                    edit_required_count = st.number_input(
+                        "Benötigte Anzahl Personen (permanent)",
+                        min_value=1,
+                        max_value=10,
+                        value=int(selected_component.get("required_resources", 1) or 1),
+                        key=f"edit_component_required_{edit_key_suffix}",
+                    )
+                    edit_transfer_time = st.number_input(
+                        "Wissensübergabe Zeit (Monate)",
+                        min_value=1,
+                        max_value=24,
+                        value=int(selected_component.get("knowledge_transfer_time_needed", 6) or 6),
+                        key=f"edit_component_transfer_{edit_key_suffix}",
+                    )
+                    edit_documentation_status = st.selectbox(
+                        "Dokumentationsgrad",
+                        ["Nicht bewertet", "Niedrig", "Mittel", "Gut"],
+                        index=["Nicht bewertet", "Niedrig", "Mittel", "Gut"].index(selected_component.get("documentation_status", "Nicht bewertet")) if selected_component.get("documentation_status", "Nicht bewertet") in ["Nicht bewertet", "Niedrig", "Mittel", "Gut"] else 0,
+                        key=f"edit_component_doc_{edit_key_suffix}",
+                    )
+
+                save_component_edit = st.form_submit_button("💾 Komponentenänderung speichern", use_container_width=True)
+
+                if save_component_edit:
+                    new_component_name = edit_component_name.strip()
+                    if not new_component_name or not edit_responsible_persons:
+                        st.error("Bitte Komponentenname und mindestens eine verantwortliche Person angeben.")
+                    else:
+                        old_name = selected_component.get("component_name", "")
+                        st.session_state.components_data[selected_component_index] = {
+                            "component_name": new_component_name,
+                            "product_name": edit_product_name,
+                            "responsible_persons": edit_responsible_persons,
+                            "complexity_score": int(edit_complexity_score),
+                            "knowledge_transfer_time_needed": int(edit_transfer_time),
+                            "required_resources": int(edit_required_count),
+                            "documentation_status": edit_documentation_status,
+                            "backup_available": bool(edit_backup_available),
+                        }
+
+                        for product in st.session_state.products_data:
+                            comps = parse_component_names(product.get("components", []))
+                            if old_name in comps and old_name != new_component_name:
+                                comps = [new_component_name if comp == old_name else comp for comp in comps]
+                            if product.get("product_name") == edit_product_name and new_component_name not in comps:
+                                comps.append(new_component_name)
+                            elif product.get("product_name") != edit_product_name and new_component_name in comps:
+                                comps = [comp for comp in comps if comp != new_component_name]
+                            product["components"] = sorted(set(comps))
+
+                        sync_master_data_to_legacy_state()
+                        save_component_state()
+                        st.success(f"✅ Komponente '{new_component_name}' wurde aktualisiert.")
+                        st.rerun()
+    else:
+        st.info("Noch keine Komponenten vorhanden.")
+
+    st.markdown("---")
     overview_col1, overview_col2 = st.columns(2)
     with overview_col1:
         st.markdown("#### 📦 Aktuelle Produkte")
@@ -871,6 +1011,82 @@ with master_tab:
             st.dataframe(component_df, use_container_width=True)
         else:
             st.info("Noch keine Komponenten hinterlegt.")
+
+    st.markdown("---")
+    st.markdown("#### 🗑️ Produkte und Komponenten löschen")
+
+    delete_col1, delete_col2 = st.columns(2)
+
+    with delete_col1:
+        st.markdown("**Produkt löschen**")
+        product_delete_options = [p.get("product_name") for p in st.session_state.products_data if p.get("product_name")]
+        if product_delete_options:
+            product_to_delete = st.selectbox(
+                "Zu löschendes Produkt",
+                options=product_delete_options,
+                key="delete_product_selector",
+            )
+            product_delete_confirm = st.checkbox(
+                "Produkt wirklich löschen",
+                key="delete_product_confirm",
+            )
+            if st.button("🗑️ Produkt löschen", key="delete_product_btn", use_container_width=True):
+                if not product_delete_confirm:
+                    st.warning("Bitte Löschung bestätigen.")
+                else:
+                    st.session_state.products_data = [
+                        product for product in st.session_state.products_data
+                        if product.get("product_name") != product_to_delete
+                    ]
+
+                    # Keep components but detach them from deleted product.
+                    for component in st.session_state.components_data:
+                        if component.get("product_name") == product_to_delete:
+                            component["product_name"] = "Unknown"
+
+                    sync_master_data_to_legacy_state()
+                    save_component_state()
+                    st.success(f"✅ Produkt '{product_to_delete}' wurde gelöscht.")
+                    st.rerun()
+        else:
+            st.info("Keine Produkte zum Löschen vorhanden.")
+
+    with delete_col2:
+        st.markdown("**Komponente löschen**")
+        component_delete_options = [c.get("component_name") for c in st.session_state.components_data if c.get("component_name")]
+        if component_delete_options:
+            component_to_delete = st.selectbox(
+                "Zu löschende Komponente",
+                options=component_delete_options,
+                key="delete_component_selector",
+            )
+            component_delete_confirm = st.checkbox(
+                "Komponente wirklich löschen",
+                key="delete_component_confirm",
+            )
+            if st.button("🗑️ Komponente löschen", key="delete_component_btn", use_container_width=True):
+                if not component_delete_confirm:
+                    st.warning("Bitte Löschung bestätigen.")
+                else:
+                    st.session_state.components_data = [
+                        component for component in st.session_state.components_data
+                        if component.get("component_name") != component_to_delete
+                    ]
+
+                    # Remove deleted component from all product component lists.
+                    for product in st.session_state.products_data:
+                        current_components = parse_component_names(product.get("components", []))
+                        product["components"] = [
+                            component_name for component_name in current_components
+                            if component_name != component_to_delete
+                        ]
+
+                    sync_master_data_to_legacy_state()
+                    save_component_state()
+                    st.success(f"✅ Komponente '{component_to_delete}' wurde gelöscht.")
+                    st.rerun()
+        else:
+            st.info("Keine Komponenten zum Löschen vorhanden.")
 
 with admin_tab:
     st.markdown("### ⚙️ Administrative Aktionen")
