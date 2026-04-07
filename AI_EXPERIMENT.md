@@ -105,11 +105,12 @@ Output:
 ## 🔧 Technical Stack
 
 ### AI Model
-- **Groq - Mixtral 8x7B** (Free & Lightning Fast)
+- **Groq - Mixtral 8x7B** (Free & Lightning Fast, but only used for exprimenting)
   - State-of-the-art open model
   - Perfect for business scenario analysis
   - **100% FREE** - no payment required
   - Ultra-fast inference (< 1 second)
+- Final version will have custom trained models from Siemens internal platform- Siemens Xcelerator tom increase data safety and accurate decisions.
 
 ### Additional Libraries
 ```python
