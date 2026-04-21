@@ -1,16 +1,16 @@
-# 🏢 AURA - AI-Powered Resource Planning & Workforce Management
+# 🏢 AURA (Automated Resource Analysis) - AI-Powered Resource Planning & Workforce Management
 
 **AURA** is an intelligent workforce resource planning platform powered by **AURORA**, an advanced AI scenario analysis engine.
 
-## 📊 What is AURA?
+## What is AURA?
 
 **AURA** (Executive Dashboard) provides comprehensive resource planning across:
-- 👥 Team management & organizational structure
-- 📅 Project allocation & capacity tracking
-- 💰 Budget forecasting & financial planning
-- 🤖 **AURORA** AI-driven scenario analysis
+- Team management & organizational structure
+- Project allocation & capacity tracking
+- Budget forecasting & financial planning
+- **AURORA** AI-driven scenario analysis
 
-## 🤖 What is AURORA?
+## What is AURORA?
 
 **AURORA** is the AI-powered decision engine within AURA that answers critical "what-if" workforce questions in seconds:
 
@@ -26,7 +26,7 @@
 - Multi-dimensional impact assessment (Timeline + Budget + Risk)
 - Transparent confidence scoring
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Python 3.12+
@@ -48,12 +48,12 @@ streamlit run app.py
 
 AURA will open at `http://localhost:8501`
 
-## 📚 Documentation
+## Documentation
 
 - **[AURA_PROJECT_ANALYSIS.md](AURA_PROJECT_ANALYSIS.md)** - Complete technical analysis
 - **[AURA_ARCHITECTURE_DIAGRAMS.md](AURA_ARCHITECTURE_DIAGRAMS.md)** - System architecture & diagrams
 
-## 🏗️ Architecture
+## Architecture
 
 ### AURA Platform (5 Pages)
 
@@ -94,7 +94,7 @@ Groq LLM (5-30s) → Response Parsing → Results & Visualizations
 - **ROI:** Saves ~€30K/month in decision-making time
 - **Confidence:** Transparent scoring builds trust
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
@@ -103,7 +103,7 @@ Groq LLM (5-30s) → Response Parsing → Results & Visualizations
 | **AI Engine** | Groq API, Llama 3.3 70B (AURORA) |
 | **Deployment** | Local/Cloud |
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 ressourcenplanner/
@@ -132,14 +132,14 @@ ressourcenplanner/
 └── requirements.txt               # Python dependencies
 ```
 
-## 🔐 Security
+## Security
 
 - API keys stored in `.env` (not in version control)
 - `.env` added to `.gitignore`
 - No hardcoded secrets
 - Groq API key validated on startup
 
-## 📊 Status
+## Status
 
 **Current:** Prototype/MVP (8/10 ready for approval)
 
@@ -149,7 +149,7 @@ ressourcenplanner/
 - ⚠️ Database (SQLite → PostgreSQL scaling needed)
 - ⚠️ Testing (add comprehensive test coverage)
 
-## 🚀 Roadmap (Post-Approval)
+## Roadmap (Post-Approval)
 
 **Phase 1 (Weeks 1-4):** Stabilization & approval presentation  
 **Phase 2 (Weeks 5-8):** Input validation & error handling  
@@ -161,7 +161,7 @@ ressourcenplanner/
 
 Created: April 2026  
 Status: Prototype for Business Approval  
-Maintained by: Development Team
+Maintained by: Tushar Tyagi
 
 ---
 
