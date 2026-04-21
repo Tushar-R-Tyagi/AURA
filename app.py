@@ -4,6 +4,13 @@ import plotly.express as px
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
 import numpy as np
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+env_path = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 from database.session_store import (
     ensure_session_state,
@@ -60,6 +67,12 @@ def parse_component_names(value):
     return [str(item).strip() for item in raw_items if str(item).strip()]
 
 
+def required_with_backup(component: dict) -> int:
+    """Return required headcount including backup coverage if enabled."""
+    base_required = int(component.get("required_resources", 1) or 1)
+    return base_required + 1 if component.get("backup_available", False) else base_required
+
+
 def sync_master_data_to_legacy_state():
     """Keep experimental master-data records in sync with legacy dashboard state."""
     st.session_state.setdefault("products_data", [])
@@ -81,7 +94,7 @@ def sync_master_data_to_legacy_state():
         responsible_people = parse_component_names(component.get("responsible_persons", []))
         component_map[component_name] = responsible_people
         component_products[component_name] = component.get("product_name", "Unknown")
-        component_requirements[component_name] = int(component.get("required_resources", 1))
+        component_requirements[component_name] = required_with_backup(component)
         component_transfer_times[component_name] = int(component.get("knowledge_transfer_time_needed", 6))
 
     st.session_state.component_map = component_map
@@ -163,6 +176,10 @@ def main():
             responsible_list = responsible if isinstance(responsible, (list, tuple)) else [responsible]
             comp_key = component.strip().lower()
             active_count = 0
+            component_details = next(
+                (item for item in st.session_state.get("components_data", []) if item.get("component_name") == component),
+                {},
+            )
 
             for _, row in df.iterrows():
                 name = str(row.get('name', '')).strip()
@@ -180,6 +197,10 @@ def main():
                 assigned = (comp_key in comps) or (name in responsible_list)
                 if assigned and started and not_left:
                     active_count += 1
+
+            # A flagged backup is treated as explicit additional coverage.
+            if component_details.get("backup_available", False):
+                active_count += 1
 
             required = int(st.session_state.component_requirements.get(component, 1))
             if active_count == 0:
@@ -263,6 +284,117 @@ def main():
         <p style="margin: 0;"><b>Heute priorisieren:</b> {urgent_cases} hochkritische Fälle unter 90 Tagen.</p>
     </div>
     """, unsafe_allow_html=True)
+
+    executive_focus = st.toggle(
+        "Executive Focus (kompakte Management-Sicht)",
+        value=True,
+        help="Zeigt eine kompakte C-Level Ansicht und blendet operative Detailblöcke aus.",
+    )
+
+    if executive_focus:
+        st.markdown("---")
+        st.markdown('<h3 class="section-header">⚡ Executive Decision Queue</h3>', unsafe_allow_html=True)
+
+        decision_items = []
+        if urgent_cases > 0:
+            decision_items.append(
+                (
+                    "SOFORT",
+                    f"{urgent_cases} kritische Exits in den nächsten 90 Tagen absichern",
+                    "Owner: Team Leads • Ziel: Risiko innerhalb von 7 Tagen senken",
+                )
+            )
+
+        if not comp_df.empty:
+            unstaffed_count = len(comp_df[comp_df["Status"] == "UNBESETZT"])
+            single_count = len(comp_df[comp_df["Status"] == "UNTERBESETZT - SINGLE"])
+            under_count = len(comp_df[comp_df["Status"] == "UNTERBESETZT"])
+
+            if unstaffed_count > 0:
+                decision_items.append(
+                    (
+                        "HOCH",
+                        f"{unstaffed_count} Komponenten sind aktuell unbesetzt",
+                        "Owner: Staffing • Maßnahme: sofortige Vertretung oder externe Kapazität",
+                    )
+                )
+            if single_count > 0:
+                decision_items.append(
+                    (
+                        "HOCH",
+                        f"{single_count} Komponenten haben Single-Point-of-Failure",
+                        "Owner: Engineering Manager • Maßnahme: Backup-Ressource innerhalb 30 Tage",
+                    )
+                )
+            if under_count > 0:
+                decision_items.append(
+                    (
+                        "MITTEL",
+                        f"{under_count} Komponenten sind unterbesetzt",
+                        "Owner: Delivery • Maßnahme: Priorisierung gegen Quartalsziele prüfen",
+                    )
+                )
+
+        if not decision_items:
+            st.success("✅ Keine unmittelbaren Eskalationen. Portfolio ist aktuell stabil.")
+        else:
+            for priority, title, action in decision_items[:3]:
+                color = colors["error"] if priority == "SOFORT" else (colors["warning"] if priority == "HOCH" else colors["info"])
+                st.markdown(
+                    f"""
+                    <div style="border-left: 5px solid {color}; background: #ffffff; border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 0.6rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08);">
+                        <p style="margin: 0; color: {color}; font-weight: 700;">{priority}</p>
+                        <p style="margin: 0.2rem 0 0.15rem 0; font-weight: 600;">{title}</p>
+                        <p style="margin: 0; color: {colors['text_secondary']};">{action}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+        st.markdown("---")
+        st.markdown('<h3 class="section-header">🧭 Portfolio Risk View</h3>', unsafe_allow_html=True)
+
+        delivery_risk_index = min(100, (urgent_cases * 8) + (critical_cases * 4) + (staffing_gap_count * 12))
+        risk_col1, risk_col2, risk_col3 = st.columns(3)
+        with risk_col1:
+            st.metric("Delivery Risk Index", f"{delivery_risk_index}/100")
+        with risk_col2:
+            st.metric("Kritische Exits (<90d)", urgent_cases)
+        with risk_col3:
+            st.metric("Komponenten mit Gap", staffing_gap_count)
+
+        if not comp_df.empty:
+            status_weight = {
+                "UNBESETZT": 100,
+                "UNTERBESETZT - SINGLE": 85,
+                "UNTERBESETZT": 65,
+                "OK": 15,
+            }
+            executive_comp_df = comp_df.copy()
+            executive_comp_df["Risiko-Score"] = executive_comp_df["Status"].map(status_weight).fillna(50)
+            executive_comp_df = executive_comp_df.sort_values(["Risiko-Score", "Komponente"], ascending=[False, True])
+
+            def status_style(val):
+                if val == "UNBESETZT":
+                    return "background-color: #ff4d4f; color: white; font-weight: bold"
+                if val == "UNTERBESETZT - SINGLE":
+                    return "background-color: #d46b08; color: white; font-weight: bold"
+                if val == "UNTERBESETZT":
+                    return "background-color: #faad14; color: #1f1f1f; font-weight: bold"
+                return "background-color: #52c41a; color: white; font-weight: bold"
+
+            st.dataframe(
+                executive_comp_df[["Komponente", "Aktive Ressourcen", "Benötigt", "Risiko-Score", "Status"]]
+                .style
+                .applymap(status_style, subset=["Status"]),
+                use_container_width=True,
+                height=320,
+            )
+        else:
+            st.info("ℹ️ Noch keine Komponenten verfügbar.")
+
+        st.caption("Für operative Detailansicht den Toggle oben deaktivieren.")
+        return
     
     # CRITICAL ALERTS SECTION  
     st.markdown("---")
@@ -696,6 +828,8 @@ def main():
                 responsible_list = responsible if isinstance(responsible, (list, tuple)) else [responsible]
                 complexity_score = int(details.get("complexity_score", 5))
                 required_people = int(details.get("required_resources", st.session_state.component_requirements.get(component, 1)))
+                if details.get("backup_available", False):
+                    required_people += 1
                 transfer_time_months = int(details.get("knowledge_transfer_time_needed", st.session_state.component_transfer_times.get(component, 6)))
                 documentation_status = details.get("documentation_status", "Nicht bewertet")
                 backup_available = "Ja" if details.get("backup_available", False) else "Nein"
