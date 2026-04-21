@@ -77,17 +77,17 @@ Groq LLM (5-30s) → Response Parsing → Results & Visualizations
 - Hiring Priority Optimization
 - Knowledge Transfer Prediction
 
-## 💡 Key Features
+## Key Features
 
-✅ **Real-time AI Analysis** - Get insights in seconds, not weeks  
-✅ **Multi-dimensional Impact** - Timeline + Budget + Risk assessment  
-✅ **Transparent Reasoning** - See why AURORA recommends something  
-✅ **Confidence Scoring** - Know how certain the AI is (0-100%)  
-✅ **Alternative Suggestions** - Explore different approaches  
-✅ **Interactive Visualizations** - Plotly charts for insights  
-✅ **German Localization** - Native language support  
+**Real-time AI Analysis** - Get insights in seconds, not weeks  
+**Multi-dimensional Impact** - Timeline + Budget + Risk assessment  
+**Transparent Reasoning** - See why AURORA recommends something  
+**Confidence Scoring** - Know how certain the AI is (0-100%)  
+**Alternative Suggestions** - Explore different approaches  
+**Interactive Visualizations** - Plotly charts for insights  
+**German Localization** - Native language support  
 
-## 📈 Business Value
+## Business Value
 
 - **Speed:** 5-30 seconds vs 2-week manual analysis
 - **Accuracy:** AI considers 20+ variables simultaneously
@@ -144,10 +144,10 @@ ressourcenplanner/
 **Current:** Prototype/MVP (8/10 ready for approval)
 
 **For Production:**
-- ✅ Logic layer (reusable)
-- ⚠️ Frontend (Streamlit → React migration needed)
-- ⚠️ Database (SQLite → PostgreSQL scaling needed)
-- ⚠️ Testing (add comprehensive test coverage)
+- Logic layer (reusable)
+- Frontend (Streamlit → React migration needed)
+- Database (SQLite → PostgreSQL scaling needed)
+- Testing (add comprehensive test coverage)
 
 ## Roadmap (Post-Approval)
 
@@ -157,7 +157,7 @@ ressourcenplanner/
 **Phase 4 (Weeks 17-24):** Enterprise features (RBAC, audit logs)  
 **Phase 5 (Ongoing):** Advanced analytics & ML  
 
-## 📧 Contact & Support
+## Contact & Support
 
 Created: April 2026  
 Status: Prototype for Business Approval  
