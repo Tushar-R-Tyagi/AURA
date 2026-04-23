@@ -129,6 +129,7 @@ ressourcenplanner/
 ├── ui/
 │   └── theme.py                   # Streamlit theming
 ├── .env                           # Configuration (add Groq API key)
+
 └── requirements.txt               # Python dependencies
 ```
 
@@ -137,7 +138,7 @@ ressourcenplanner/
 - API keys stored in `.env` (not in version control)
 - `.env` added to `.gitignore`
 - No hardcoded secrets
-- Groq API key validated on startup
+- Groq API key validated on startup (Note : The models will be trained on Siemens accelerator platform)
 
 ## Status
 
