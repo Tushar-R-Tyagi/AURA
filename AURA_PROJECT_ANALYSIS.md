@@ -5,6 +5,8 @@
 **Technology Stack:** Python, Streamlit, SQLite, Groq LLM, Plotly  
 **Date:** April 1, 2026  
 
+> Note (April 25, 2026): This document captures an earlier project snapshot. Use it for architecture context, but verify implementation status against the current repository (tests, dependencies, and CI have evolved).
+
 ---
 
 ## 📋 TABLE OF CONTENTS
