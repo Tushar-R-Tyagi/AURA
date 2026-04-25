@@ -130,7 +130,7 @@ ressourcenplanner/
 - API keys stored in `.env` (not in version control)
 - `.env` added to `.gitignore`
 - No hardcoded secrets
-- Groq API key validated on startup (Note : The models will be trained on Siemens accelerator platform)
+- Groq API key validated on startup (Note : The models will be trained on Siemens accelerator platform after approval)
 
 ### Setup
 
