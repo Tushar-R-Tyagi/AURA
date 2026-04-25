@@ -87,7 +87,7 @@ Core directories:
 
 ## ATS-Aligned Roadmap Direction
 
-To align with the quality bar of companies like Ashby, the next milestones are:
+To take the project to enterprise level, the next milestones are:
 
 1. Documentation and narrative consistency (single source of truth)
 2. ATS-native domain model extensions (jobs, candidates, stages, interviews, offers)
