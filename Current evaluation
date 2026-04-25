@@ -1,0 +1,22 @@
+ISSUES:
+AI reliability is still fragile (response parsing and output consistency risks).
+Repo narrative is inconsistent in places (some docs look outdated vs current code state).
+ATS-specific domain depth is missing (pipeline stages, interview load, offer conversion, time-to-hire, source quality).
+No clear API-first integration story yet.
+No visible AI evaluation/guardrail framework for trust in decision support.
+
+STEPS:
+Reposition in one line:
+A talent capacity decision engine that connects hiring pipeline, team capacity, and budget with explainable recommendations.
+Add ATS-native data model:
+Jobs, candidates, stage events, interviews, offers, hiring plans, capacity forecast.
+Harden AI for production:
+Strict schema validation, versioned prompts, retries/fallbacks, deterministic checks.
+Add an API layer:
+Decision-oriented endpoints to show integration readiness.
+Show engineering rigor:
+Coverage targets, contract tests for AI output schema, integration tests, architecture decisions.
+Add business metrics:
+Time-to-fill, interviewer load, offer acceptance probability, hiring risk index, confidence + uncertainty.
+Clean product narrative:
+Single source of truth for “current state, gaps, and next milestones.”
