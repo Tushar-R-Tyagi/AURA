@@ -1,81 +1,73 @@
-# 🏢 AURA (Automated Resource Analysis) - AI-Powered Resource Planning & Workforce Management
+# AURA: Automated Resource Analytics
 
-**AURA** is an intelligent workforce resource planning platform powered by **AURORA**, an advanced AI scenario analysis engine.
+AURA is a workforce planning and decision-support platform.
 
-## What is AURA?
+It combines team data, allocation data, budget constraints, and AI-assisted scenario analysis to answer practical planning questions such as:
 
-**AURA** (Executive Dashboard) provides comprehensive resource planning across:
-- Team management & organizational structure
-- Project allocation & capacity tracking
-- Budget forecasting & financial planning
-- **AURORA** AI-driven scenario analysis
+- Where do we have staffing risk right now?
+- What is the impact of delaying a hire?
+- Which hiring sequence reduces risk most under budget limits?
+- How likely is a knowledge transfer to succeed before planned exits?
 
-## What is AURORA?
+## Product Positioning
 
-**AURORA** is the AI-powered decision engine within AURA that answers critical "what-if" workforce questions in seconds:
+This project is intentionally positioned as a decision layer, not only as a dashboard.
 
-- What if we delay hiring for this component?
-- What if we add a new team member?
-- Where should we prioritize new hires?
-- What's our knowledge transfer risk?
-- How will decisions affect budget & timeline?
+- AURA is the platform (data + workflows + reporting)
+- AURORA is the AI reasoning engine inside AURA
 
-**AURORA** combines:
-- Real-time LLM reasoning (Groq's Llama 3.3 70B)
-- Company-specific workforce data analysis
-- Multi-dimensional impact assessment (Timeline + Budget + Risk)
-- Transparent confidence scoring
+Target direction: evolve from internal workforce planning to ATS-adjacent hiring intelligence.
 
-## Quick Start
+## Why This Matters
 
-### Prerequisites
-- Python 3.12+
-- Groq API key (free at https://console.groq.com)
+Most organizations make hiring and staffing decisions across separate systems (recruiting, delivery, finance).
+That creates blind spots.
 
-### Setup
+AURA focuses on connecting those signals so decisions are:
 
-```bash
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+- faster
+- explainable
+- measurable
+- constrained by real budget and capacity limits
 
-# Create .env file
-echo "GROQ_API_KEY=gsk_YOUR_KEY_HERE" > .env
+## Current Scope
 
-# Run AURA
-streamlit run app.py
-```
+### Functional Areas
 
-AURA will open at `http://localhost:8501`
+1. Executive Dashboard
+2. Master Data Management
+3. Project Allocation Management
+4. Financial Management
+5. AI Scenario Analysis
 
-## Documentation
+### AI Scenario Types
 
-- **[AURA_PROJECT_ANALYSIS.md](AURA_PROJECT_ANALYSIS.md)** - Complete technical analysis
-- **[AURA_ARCHITECTURE_DIAGRAMS.md](AURA_ARCHITECTURE_DIAGRAMS.md)** - System architecture & diagrams
+1. Hiring delay impact
+2. Employee addition impact
+3. Component risk analysis
+4. Hiring priority recommendation
+5. Knowledge transfer success prediction
+6. Custom free-form strategic questions
 
-## Architecture
+## Architecture Overview
 
-### AURA Platform (5 Pages)
+The codebase follows a layered structure:
 
-1. **🏠 Executive Dashboard** - Strategic overview & KPIs
-2. **🛠️ Stammdaten Management** - Team, components, budgets
-3. **📅 Projekt Allocation** - Capacity & project assignments
-4. **💰 Finanzielle Verwaltung** - Budget forecasting
-5. **🤖 AURORA Scenarios** - AI-powered what-if analysis
+- Presentation Layer: Streamlit pages and dashboard UX
+- Logic Layer: business services and scenario reasoning
+- Data Access Layer: repository-style persistence APIs
+- Persistence Layer: SQLite schema and state tables
 
-### AURORA Engine (AI Core)
+Core directories:
 
-```
-User Scenario → Context Building → Prompt Construction → 
-Groq LLM (5-30s) → Response Parsing → Results & Visualizations
-```
+- app.py
+- pages/
+- logic/
+- database/
+- ui/
+- tests/
 
-**Scenario Types:**
-- Hiring Delay Impact
-- Employee Addition Analysis
-- Component Risk Assessment
-- Hiring Priority Optimization
-- Knowledge Transfer Prediction
+## Engineering Status (April 2026)
 
 ## Key Features
 
@@ -89,21 +81,21 @@ Groq LLM (5-30s) → Response Parsing → Results & Visualizations
 
 ## Business Value
 
-- **Speed:** 5-30 seconds vs 2-week manual analysis
-- **Accuracy:** AI considers 20+ variables simultaneously
-- **ROI:** Saves ~€30K/month in decision-making time
-- **Confidence:** Transparent scoring builds trust
+- AI output robustness and strict schema enforcement
+- Broader test coverage (integration + scenario-level tests)
+- API-first integration layer for external systems
+- Stronger observability and auditability
+- Multi-user and role-based access patterns
 
-## Tech Stack
+## ATS-Aligned Roadmap Direction
 
-| Layer | Technology |
-|-------|-----------|
-| **Frontend** | Streamlit 1.28.1, Plotly 5.17.0 |
-| **Backend** | Python 3.12, SQLite |
-| **AI Engine** | Groq API, Llama 3.3 70B (AURORA) |
-| **Deployment** | Local/Cloud |
+To take the project to enterprise level, the next milestones are:
 
-## Project Structure
+1. Documentation and narrative consistency (single source of truth)
+2. ATS-native domain model extensions (jobs, candidates, stages, interviews, offers)
+3. AI hardening (validation, fallbacks, evaluation harness)
+4. API contracts for integration-ready decision services
+5. Decision quality metrics (time-to-fill, risk reduction, load balancing)
 
 ```
 ressourcenplanner/
@@ -133,16 +125,22 @@ ressourcenplanner/
 └── requirements.txt               # Python dependencies
 ```
 
-## Security
+### Prerequisites
 
 - API keys stored in `.env` (not in version control)
 - `.env` added to `.gitignore`
 - No hardcoded secrets
 - Groq API key validated on startup (Note : The models will be trained on Siemens accelerator platform)
 
-## Status
+### Setup
 
-**Current:** Prototype/MVP (8/10 ready for approval)
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+echo "GROQ_API_KEY=gsk_YOUR_KEY_HERE" > .env
+streamlit run app.py
+```
 
 **For Production:**
 - Logic layer (reusable)
@@ -150,22 +148,20 @@ ressourcenplanner/
 - Database (SQLite → PostgreSQL scaling needed)
 - Testing (add comprehensive test coverage)
 
-## Roadmap (Post-Approval)
+## Tests
 
-**Phase 1 (Weeks 1-4):** Stabilization & approval presentation  
-**Phase 2 (Weeks 5-8):** Input validation & error handling  
-**Phase 3 (Weeks 9-16):** React migration & PostgreSQL  
-**Phase 4 (Weeks 17-24):** Enterprise features (RBAC, audit logs)  
-**Phase 5 (Ongoing):** Advanced analytics & ML  
+Run unit tests:
+
+```bash
+pytest -q tests
+```
 
 ## Contact & Support
 
-Created: April 2026  
-Status: Prototype for Business Approval  
-Maintained by: Tushar Tyagi
+- AURA_PROJECT_ANALYSIS.md
+- AURA_ARCHITECTURE_DIAGRAMS.md
+- AI_EXPERIMENT.md
 
----
+## Notes
 
-**Remember:** 
-- **AURA** = The complete resource planning platform
-- **AURORA** = The AI scenario analysis engine within AURA
+This repository is an active refactoring effort and is intended to show product thinking, engineering structure, and practical AI decision-support patterns in a real planning domain.
