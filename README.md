@@ -69,15 +69,17 @@ Core directories:
 
 ## Engineering Status (April 2026)
 
-### What is already in place
+## Key Features
 
-- Modular service and repository structure
-- SQLite-backed persistence for key app state
-- Unit tests for core logic modules
-- CI workflow for automated test execution
-- Environment-based secret handling for API keys
+**Real-time AI Analysis** - Get insights in seconds, not weeks  
+**Multi-dimensional Impact** - Timeline + Budget + Risk assessment  
+**Transparent Reasoning** - See why AURORA recommends something  
+**Confidence Scoring** - Know how certain the AI is (0-100%)  
+**Alternative Suggestions** - Explore different approaches  
+**Interactive Visualizations** - Plotly charts for insights  
+**German Localization** - Native language support  
 
-### Known gaps before production-grade maturity
+## Business Value
 
 - AI output robustness and strict schema enforcement
 - Broader test coverage (integration + scenario-level tests)
@@ -95,12 +97,40 @@ To take the project to enterprise level, the next milestones are:
 4. API contracts for integration-ready decision services
 5. Decision quality metrics (time-to-fill, risk reduction, load balancing)
 
-## Quick Start
+```
+ressourcenplanner/
+├── app.py                          # Main AURA dashboard
+├── pages/
+│   ├── Stammdaten_Management.py   # Team management
+│   ├── Projekt_Allocation.py      # Project allocation
+│   ├── Finanzielle_Verwaltung.py # Budget management
+│   └── Scenario_Analysis.py       # AURORA scenarios
+├── logic/
+│   ├── scenario_engine.py         # AURORA AI engine
+│   ├── team_service.py            # Team logic
+│   ├── finance_service.py         # Finance logic
+│   ├── allocation_service.py      # Allocation logic
+│   └── visualization_service.py   # Chart generation
+├── database/
+│   ├── connection.py              # SQLite connection
+│   ├── schema.py                  # Database schema
+│   ├── team_repository.py         # Team data access
+│   ├── finance_repository.py      # Finance data access
+│   ├── allocation_repository.py   # Allocation data access
+│   └── session_store.py           # State persistence
+├── ui/
+│   └── theme.py                   # Streamlit theming
+├── .env                           # Configuration (add Groq API key)
+
+└── requirements.txt               # Python dependencies
+```
 
 ### Prerequisites
 
-- Python 3.12+
-- Groq API key
+- API keys stored in `.env` (not in version control)
+- `.env` added to `.gitignore`
+- No hardcoded secrets
+- Groq API key validated on startup (Note : The models will be trained on Siemens accelerator platform)
 
 ### Setup
 
@@ -112,7 +142,11 @@ echo "GROQ_API_KEY=gsk_YOUR_KEY_HERE" > .env
 streamlit run app.py
 ```
 
-Open http://localhost:8501.
+**For Production:**
+- Logic layer (reusable)
+- Frontend (Streamlit → React migration needed)
+- Database (SQLite → PostgreSQL scaling needed)
+- Testing (add comprehensive test coverage)
 
 ## Tests
 
@@ -122,7 +156,7 @@ Run unit tests:
 pytest -q tests
 ```
 
-## Additional Project Docs
+## Contact & Support
 
 - AURA_PROJECT_ANALYSIS.md
 - AURA_ARCHITECTURE_DIAGRAMS.md
