@@ -1,4 +1,4 @@
-# AURA: Hiring and Capacity Decision Intelligence
+# AURA: Automated Resource Analytics
 
 AURA is a workforce planning and decision-support platform.
 
