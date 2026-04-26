@@ -2,12 +2,23 @@
 
 AURA is a workforce planning and decision-support platform.
 
-It combines team data, allocation data, budget constraints, and AI-assisted scenario analysis to answer practical planning questions such as:
+It combines team data, allocation data, budget constraints, business intelligence tools and AI-assisted scenario analysis to answer practical planning questions such as:
 
 - Where do we have staffing risk right now?
 - What is the impact of delaying a hire?
 - Which hiring sequence reduces risk most under budget limits?
 - How likely is a knowledge transfer to succeed before planned exits?
+
+## DEMO VIDEO
+
+
+
+
+https://github.com/user-attachments/assets/42048a2c-fc8b-4905-a420-52c4495e4232
+
+
+
+
 
 ## Product Positioning
 
