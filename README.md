@@ -9,7 +9,7 @@ It combines team data, allocation data, budget constraints, business intelligenc
 - Which hiring sequence reduces risk most under budget limits?
 - How likely is a knowledge transfer to succeed before planned exits?
 
-## DEMO VIDEO
+## DEMO VIDEO (with dummy data)
 
 
 
