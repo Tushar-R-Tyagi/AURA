@@ -9,6 +9,8 @@ It combines team data, allocation data, budget constraints, business intelligenc
 - Which hiring sequence reduces risk most under budget limits?
 - How likely is a knowledge transfer to succeed before planned exits?
 
+Note: This tool was developed independently on my own time by me after recognizing a bottleneck at Siemens, but belongs completely to me.
+
 ## DEMO VIDEO (with dummy data)
 
 
