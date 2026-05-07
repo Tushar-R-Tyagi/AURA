@@ -290,7 +290,8 @@ if not df.empty:
     if granularity == "Monatlich":
         freq = 'M'
     elif granularity == "Quartalsweise":
-        freq = 'Q'
+        # Use explicit quarter-end offset 'QE' (pandas requires explicit quarter offsets)
+        freq = 'QE'
     else:  # Jährlich
         freq = 'Y'
     
